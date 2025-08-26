@@ -10,6 +10,13 @@ PsychScribe addresses the documentation burden faced by psychiatrists by providi
 - **Privacy-first** approach with all data staying on your device
 - **Simple workflow** for quick note-taking after patient sessions
 
+## 🔒 Privacy First
+
+- **All processing happens on your Mac** - no cloud services or external APIs
+- **Your patient data never leaves your device** - complete local control
+- **No internet connection required** for transcription
+- **Built with privacy in mind** from the ground up
+
 ## 🚀 Current Status
 
 **Phase 0**: Proof of Concept - Whisper accuracy validation (In Progress)
@@ -114,7 +121,11 @@ This is a personal project focused on learning and validation. Contributions are
 
 ## 📄 License
 
-ISC License - see LICENSE file for details.
+MIT License - see LICENSE file for details.
+
+## ⚠️ Medical Disclaimer
+
+**This software is not FDA approved and should not be used as the sole method for maintaining medical records. Always verify transcriptions for accuracy.**
 
 ## 🎯 Success Metrics
 

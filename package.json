@@ -23,7 +23,7 @@
   },
   "keywords": ["psychiatry", "dictation", "transcription", "whisper", "electron", "medical"],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "bugs": {
     "url": "https://github.com/marchatton/doctor-dictate/issues"
