@@ -2,7 +2,7 @@
 
 A desktop application for solo psychiatrists that accurately transcribes clinical dictation locally, optimized for psychiatric medication terminology.
 
-## TL;DR
+## TL;DRe
 
 Solo psychiatrists waste hours on documentation and face privacy concerns with cloud dictation. PsychScribe uses Whisper AI locally to achieve >95% accuracy on psychiatric terms. This is a side project targeting 10 paid users initially. Phase 0 validates accuracy, V0 delivers basic transcription, V1 adds encryption and templates.
 
@@ -25,6 +25,12 @@ Prove Whisper can achieve >95% accuracy on psychiatric terminology before buildi
 1. **Whisper large-v3** (most accurate, 1.55GB, ~3-5 min for 10-min audio)
 2. **Whisper medium.en** (faster, 764MB, ~1-2 min for 10-min audio)
 3. **Whisper small.en** (fastest, 244MB, ~30-60 sec for 10-min audio)
+
+**Local Medical Dictionary**:
+- Store psychiatric medications, conditions, and terminology locally
+- Use for accuracy validation and confidence scoring
+- No external dependencies or network calls
+- Privacy-focused: all medical knowledge stays on device
 
 ### Privacy Note on Whisper
 - Whisper processes audio 100% locally - no data leaves the device

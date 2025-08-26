@@ -1,0 +1,32 @@
+{
+  "word_accuracy": 70.45,
+  "medication_accuracy": 10.53,
+  "total_medications": 19,
+  "correct_medications": 2,
+  "original_medications": [
+    "sertraline 100 milligrams",
+    "fluoxetine 20 milligrams",
+    "mirtazapine 15 milligrams",
+    "lamotrigine 200 milligrams",
+    "atomoxetine 40 milligrams",
+    "alprazolam 0.5 milligrams",
+    "aripiprazole 10 milligrams",
+    "trazodone 50 milligrams",
+    "gabapentin 300 milligrams",
+    "prazosin 2 milligrams",
+    "donepezil 10 milligrams",
+    "bupropion 300 milligrams",
+    "quetiapine 100 milligrams",
+    "lithium",
+    "divalproex",
+    "clonazepam 1 milligram",
+    "duloxetine 60 milligrams",
+    "ziprasidone 40 milligrams",
+    "buspirone 15 milligrams"
+  ],
+  "transcribed_medications": [
+    "gabapentin 300 milligrams",
+    "lithium"
+  ],
+  "word_error_rate": 29.55
+}
