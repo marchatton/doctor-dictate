@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    <title>PsychScribe - Local Dictation for Psychiatrists</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <h1 class="app-title">PsychScribe</h1>
+            <p class="app-subtitle">Local Dictation for Psychiatrists</p>
+            <div class="app-info">
+                <span id="app-version">v1.0.0</span>
+                <span id="app-status" class="status-offline">Offline</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Recording Section -->
+            <section class="recording-section">
+                <div class="recording-controls">
+                    <button id="record-btn" class="btn btn-primary btn-large">
+                        <span class="btn-icon">🎤</span>
+                        Start Recording
+                    </button>
+                    <button id="stop-btn" class="btn btn-secondary btn-large" disabled>
+                        <span class="btn-icon">⏹️</span>
+                        Stop Recording
+                    </button>
+                </div>
+                
+                <div class="recording-status">
+                    <div class="timer" id="recording-timer">00:00</div>
+                    <div class="recording-indicator" id="recording-indicator"></div>
+                </div>
+            </section>
+
+            <!-- Transcription Section -->
+            <section class="transcription-section" id="transcription-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Transcription</h2>
+                    <div class="transcription-actions">
+                        <button id="edit-btn" class="btn btn-outline">Edit</button>
+                        <button id="save-btn" class="btn btn-success">Save</button>
+                        <button id="export-pdf-btn" class="btn btn-outline">Export PDF</button>
+                    </div>
+                </div>
+                
+                <div class="transcription-content">
+                    <div class="progress-container" id="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <div class="progress-text" id="progress-text">Processing audio...</div>
+                    </div>
+                    
+                    <div class="transcript-editor" id="transcript-editor" style="display: none;">
+                        <textarea id="transcript-text" placeholder="Transcription will appear here..."></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Templates Section (V1 feature) -->
+            <section class="templates-section" id="templates-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Templates</h2>
+                </div>
+                <div class="template-buttons">
+                    <button class="btn btn-outline template-btn" data-template="medication">Medication Management</button>
+                    <button class="btn btn-outline template-btn" data-template="psychotherapy">Psychotherapy Notes</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Your notes never leave your Mac • Built with privacy in mind</p>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p id="loading-text">Processing...</p>
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div id="error-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Error</h3>
+                <button class="modal-close" id="error-modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="error-message">An error occurred.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="error-modal-ok">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="renderer.js"></script>
+</body>
+</html>
