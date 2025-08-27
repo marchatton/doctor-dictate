@@ -1,7 +1,7 @@
 {
-  "name": "psychscribe",
+  "name": "doctor-dictate",
   "version": "1.0.0",
-  "description": "A desktop application for solo psychiatrists that accurately transcribes clinical dictation locally, optimised for psychiatric medication terminology.",
+  "description": "A desktop application for medical professionals that accurately transcribes clinical dictation locally, optimized for medical terminology.",
   "main": "src/main.js",
   "directories": {
     "doc": "docs"
@@ -21,7 +21,7 @@
     "type": "git",
     "url": "git+https://github.com/marchatton/doctor-dictate.git"
   },
-  "keywords": ["psychiatry", "dictation", "transcription", "whisper", "electron", "medical"],
+  "keywords": ["medical", "dictation", "transcription", "whisper", "electron", "healthcare"],
   "author": "",
   "license": "MIT",
   "type": "commonjs",
@@ -42,8 +42,8 @@
     "whisper-node": "^0.1.0"
   },
   "build": {
-    "appId": "com.psychscribe.app",
-    "productName": "PsychScribe",
+    "appId": "com.doctordictate.app",
+    "productName": "DoctorDictate",
     "directories": {
       "output": "dist"
     },

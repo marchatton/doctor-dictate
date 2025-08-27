@@ -1,0 +1,111 @@
+{
+  "raw_results": {
+    "word_accuracy": 67.53,
+    "medication_accuracy": 63.16,
+    "word_error_rate": 32.47,
+    "correct_medications": 12,
+    "transcribed_medications": [
+      "sertraline 100 mg",
+      "fluoxetine 20 mg",
+      "lamotrigine 200 mg",
+      "atomoxetine 40 mg",
+      "alprazolam 0.5 mg",
+      "trazodone 50 mg",
+      "gabapentin 300 mg",
+      "lithium",
+      "clonazepam 1 mg",
+      "duloxetine 60 mg",
+      "ziprasidone 40 mg",
+      "buspirone 15 mg"
+    ]
+  },
+  "corrected_results": {
+    "word_accuracy": 69.48,
+    "medication_accuracy": 100.0,
+    "word_error_rate": 30.52,
+    "correct_medications": 19,
+    "transcribed_medications": [
+      "sertraline 100 mg",
+      "fluoxetine 20 mg",
+      "mirtazapine 15 mg",
+      "lamotrigine 200 mg",
+      "atomoxetine 40 mg",
+      "alprazolam 0.5 mg",
+      "aripiprazole 10 mg",
+      "trazodone 50 mg",
+      "gabapentin 300 mg",
+      "prazosin 2 mg",
+      "donepezil 10 mg",
+      "bupropion 300 mg",
+      "quetiapine 100 mg",
+      "lithium",
+      "divalproex",
+      "clonazepam 1 mg",
+      "duloxetine 60 mg",
+      "ziprasidone 40 mg",
+      "buspirone 15 mg"
+    ]
+  },
+  "improvements": {
+    "word_accuracy_gain": 1.95,
+    "medication_accuracy_gain": 36.84,
+    "additional_medications_found": 7
+  },
+  "corrections_applied": [
+    [
+      "tumour tazepine",
+      "mirtazapine"
+    ],
+    [
+      "arypiprazol",
+      "aripiprazole"
+    ],
+    [
+      "alprazolim",
+      "alprazolam"
+    ],
+    [
+      "prasas in",
+      "prazosin"
+    ],
+    [
+      "denepazol",
+      "donepezil"
+    ],
+    [
+      "bipropion",
+      "bupropion"
+    ],
+    [
+      "quisiopine",
+      "quetiapine"
+    ],
+    [
+      "divalprog",
+      "divalproex"
+    ]
+  ],
+  "total_medications": 19,
+  "original_medications": [
+    "sertraline 100 mg",
+    "fluoxetine 20 mg",
+    "mirtazapine 15 mg",
+    "lamotrigine 200 mg",
+    "atomoxetine 40 mg",
+    "alprazolam 0.5 mg",
+    "aripiprazole 10 mg",
+    "trazodone 50 mg",
+    "gabapentin 300 mg",
+    "prazosin 2 mg",
+    "donepezil 10 mg",
+    "bupropion 300 mg",
+    "quetiapine 100 mg",
+    "lithium",
+    "divalproex",
+    "clonazepam 1 mg",
+    "duloxetine 60 mg",
+    "ziprasidone 40 mg",
+    "buspirone 15 mg"
+  ],
+  "transcribed_corrected_text": " psychiatric medication dictation test script, patient presence with major depressive disorder, currently taking sertraline 100 mg daily, prescribed eight weeks ago, patient reports initial improvement but now experiencing increased anxiety, considering cross-tapering mirtazapine 15 mg at bedtime, for bipilla maintenance, continuing lamotrigine 200 mg daily, patient stable on this regimen for six months, lab work shows therapeutic levels, ADHD management with atomoxetine 40 mg in the morning, patient tolerating well with improved focus, no cardiovascular concerns, anxiety symptoms addressed with alprazolam 0.5 mg as needed, maximum twice daily, discussed addiction potential and tapering schedule, anti-sachotic aripiprazole 10 mg daily added for mood stabilisation, monitoring for extra pyramidal symptoms and weight gain, sleep disorder treated with trazodone 50 mg at bedtime, patient reports improved sleep latency and duration, pain management includes gabapentin 300 mg 3 times daily for neuropathic symptoms, consider dose escalation if needed, PTSD treatment with prazosin 2 mg at bedtime for nightmares, effective in reducing trauma-related sleep disturbances, cognitive enhancement with donepezil 10 mg daily, patient showing modest improvement in memory tasks and daily functioning, for treatment-resistant depression, considering bupropion 300 mg extended release as adjunct therapy, monitor for seizure risk and hypertension, additional medications include fluoxetine 20 mg daily, quetiapine 100 mg at bedtime lithium carbonate 600 mg twice daily, divalproex sodium 500 mg extended release, clonazepam 1 mg twice daily, duloxetine 60 mg daily, ziprasidone 40 mg twice daily, buspirone 15 mg twice daily, dosage adjustments, increased sertraline to 150 mg if tolerated, taper alprazolam by 0.25 mg weekly, titrate gabapentin to 600 mg 3 times daily, consider lithium level check in 2 weeks, side effects to monitor, sedation, weight gain, sexual dysfunction, extra pyramidal symptoms, liver function, and kidney function, patient education provided regarding medication compliance, side effects, and follow-up appointments in 4 weeks."
+}

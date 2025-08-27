@@ -1,6 +1,6 @@
-// Basic test file for PsychScribe application
+// Basic test file for DoctorDictate application
 
-describe('PsychScribe App', () => {
+describe('DoctorDictate App', () => {
   test('should have basic structure', () => {
     // This is a placeholder test to verify Jest is working
     expect(true).toBe(true);

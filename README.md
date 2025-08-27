@@ -1,14 +1,14 @@
-# PsychScribe - Local-First Dictation for Psychiatrists
+# DoctorDictate - Local-First Medical Transcription
 
-A desktop application for solo psychiatrists that accurately transcribes clinical dictation locally, optimized for psychiatric medication terminology.
+A desktop application for medical professionals that accurately transcribes clinical dictation locally, optimized for medical terminology.
 
 ## 🎯 Project Overview
 
-PsychScribe addresses the documentation burden faced by psychiatrists by providing:
+DoctorDictate addresses the documentation burden faced by medical professionals by providing:
 - **Local transcription** using Whisper AI (no cloud processing)
-- **Medical accuracy** optimized for psychiatric terminology
+- **Medical accuracy** optimized for medical terminology
 - **Privacy-first** approach with all data staying on your device
-- **Simple workflow** for quick note-taking after patient sessions
+- **Simple workflow** for quick note-taking during or after patient sessions
 
 ## 🔒 Privacy First
 
@@ -129,7 +129,7 @@ MIT License - see LICENSE file for details.
 
 ## 🎯 Success Metrics
 
-- **Phase 0**: >95% accuracy on psychiatric terminology
+- **Phase 0**: >95% accuracy on medical terminology
 - **V0**: Working transcription tool with 2-3 beta users
 - **V1**: 10 paid users at $49/month
 
@@ -147,5 +147,5 @@ For questions or feedback, please open an issue in the repository.
 
 ---
 
-**Built with privacy in mind - Your notes never leave your Mac**
+**Built with privacy in mind - Your medical notes never leave your device**
 

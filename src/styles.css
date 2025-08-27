@@ -56,6 +56,77 @@ body {
     color: #27ae60;
 }
 
+/* Model selection */
+.model-selection {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+.model-label {
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+    min-width: 60px;
+}
+
+/* Toggle Switch Styles */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 30px;
+    margin: 0 0.5rem;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 30px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 22px;
+    width: 22px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #3498db;
+}
+
+input:checked + .slider:before {
+    transform: translateX(30px);
+}
+
+.model-info {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.8rem;
+    font-style: italic;
+}
+
 /* Main content */
 .main-content {
     flex: 1;
@@ -194,6 +265,42 @@ body {
     100% { opacity: 1; }
 }
 
+/* Audio Level Meter */
+.audio-level-meter {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.level-label {
+    font-size: 0.9rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.level-bar-container {
+    width: 200px;
+    height: 20px;
+    background-color: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid #dee2e6;
+}
+
+.level-bar {
+    height: 100%;
+    background: linear-gradient(90deg, 
+        #28a745 0%, 
+        #28a745 50%, 
+        #ffc107 70%, 
+        #dc3545 90%);
+    width: 0%;
+    transition: width 0.1s ease-out;
+    border-radius: 8px;
+}
+
 /* Transcription section */
 .transcription-actions {
     display: flex;
@@ -246,6 +353,80 @@ body {
     outline: none;
     border-color: #3498db;
     box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+/* Transcription info panel */
+.transcription-info {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.info-item:last-child {
+    margin-bottom: 0;
+}
+
+.info-label {
+    font-weight: 600;
+    color: #495057;
+    min-width: 100px;
+    margin-right: 0.5rem;
+}
+
+.info-value {
+    color: #6c757d;
+    flex: 1;
+}
+
+.corrections-list {
+    margin-top: 0.5rem;
+    padding-left: 1rem;
+}
+
+.correction-item {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+details {
+    margin-top: 0.5rem;
+}
+
+summary {
+    cursor: pointer;
+    color: #007bff;
+    font-weight: 500;
+}
+
+summary:hover {
+    color: #0056b3;
+}
+
+/* Status indicator colors */
+.status-loading {
+    color: #ffc107 !important;
+}
+
+.status-online {
+    color: #28a745 !important;
+}
+
+.status-error {
+    color: #dc3545 !important;
 }
 
 /* Templates section */

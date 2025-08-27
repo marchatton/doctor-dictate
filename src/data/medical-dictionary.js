@@ -1,4 +1,4 @@
-// Local Medical Dictionary for PsychScribe
+// Local Medical Dictionary for DoctorDictate
 // Contains psychiatric medications, conditions, and terminology
 // All data stored locally - no external dependencies
 

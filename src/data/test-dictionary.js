@@ -3,7 +3,7 @@
 
 const medicalDictionary = require('./medical-dictionary.js');
 
-console.log('🧪 Testing PsychScribe Medical Dictionary\n');
+console.log('🧪 Testing DoctorDictate Medical Dictionary\n');
 
 // Test 1: Basic medication lookup
 console.log('1. Testing medication lookup:');

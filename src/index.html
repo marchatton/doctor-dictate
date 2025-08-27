@@ -4,18 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
-    <title>PsychScribe - Local Dictation for Psychiatrists</title>
+    <title>DoctorDictate - Local Medical Transcription</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div id="app">
         <!-- Header -->
         <header class="app-header">
-            <h1 class="app-title">PsychScribe</h1>
+            <h1 class="app-title">DoctorDictate</h1>
             <p class="app-subtitle">Local Dictation for Psychiatrists</p>
             <div class="app-info">
                 <span id="app-version">v1.0.0</span>
                 <span id="app-status" class="status-offline">Offline</span>
+            </div>
+            
+            <!-- Model Selection -->
+            <div class="model-selection">
+                <label for="model-toggle" class="model-label">Mode:</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="model-toggle" checked>
+                    <span class="slider"></span>
+                </label>
+                <span id="model-info" class="model-info">High Accuracy (Slower)</span>
             </div>
         </header>
 
@@ -37,6 +47,12 @@
                 <div class="recording-status">
                     <div class="timer" id="recording-timer">00:00</div>
                     <div class="recording-indicator" id="recording-indicator"></div>
+                    <div class="audio-level-meter" id="audio-level-meter" style="display: none;">
+                        <label class="level-label">Audio Level:</label>
+                        <div class="level-bar-container">
+                            <div class="level-bar" id="level-bar"></div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
