@@ -1,22 +1,14 @@
 /**
  * Dictation Command Processor for DoctorDictate
  * Converts voice dictation commands to formatted text
- * 
- * Common commands used by doctors:
- * - "next paragraph" / "new paragraph" → \n\n
- * - "next line" / "new line" → \n
- * - "comma" → ,
- * - "period" / "full stop" → .
- * - "colon" → :
- * - "semicolon" → ;
- * - "open parenthesis" / "open paren" → (
- * - "close parenthesis" / "close paren" → )
- * - "quote" / "open quote" → "
- * - "unquote" / "close quote" → "
+ * Enhanced with medical formatting for psychiatric notes
  */
+
+const { MedicalFormatter } = require('./medical-formatter.js');
 
 class DictationCommandProcessor {
     constructor() {
+        this.medicalFormatter = new MedicalFormatter();
         // Define command mappings
         this.commands = {
             // Paragraph and line breaks
@@ -276,33 +268,23 @@ class DictationCommandProcessor {
     
     /**
      * Process medical note formatting specifically
+     * Enhanced with comprehensive medical formatting including Ollama LLM
      */
-    processMedicalNote(text) {
-        const result = this.processCommands(text);
+    async processMedicalNote(text) {
+        // First pass: Handle dictation commands
+        const dictationResult = this.processCommands(text);
         
-        // Additional medical-specific formatting
-        let processed = result.processed;
-        
-        // Format medication dosages (ensure spacing)
-        processed = processed.replace(/(\d+)\s*(mg|mcg|ml)\b/gi, '$1 $2');
-        
-        // Format numbered lists
-        processed = processed.replace(/\b(\d+)\s*,\s*/g, '\n$1. ');
-        
-        // Ensure headers are on new lines
-        const headers = [
-            'Identification:', 'Chief Complaint:', 'Problem List:',
-            'Current Medications:', 'Assessment:', 'Plan:', 'Follow-up:'
-        ];
-        
-        for (const header of headers) {
-            const headerRegex = new RegExp(`([^\n])(${header})`, 'gi');
-            processed = processed.replace(headerRegex, '$1\n\n$2');
-        }
+        // Second pass: Apply comprehensive medical formatting (now async for Ollama)
+        const medicalResult = await this.medicalFormatter.formatMedicalNote(dictationResult.processed);
         
         return {
-            ...result,
-            processed,
+            original: text,
+            processed: medicalResult.formatted,
+            commands: dictationResult.commands,
+            commandCount: dictationResult.commandCount,
+            improvements: medicalResult.improvements,
+            method: medicalResult.method,
+            model: medicalResult.model,
             formatted: true
         };
     }

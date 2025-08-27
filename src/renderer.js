@@ -247,6 +247,80 @@ class DoctorDictateApp {
     }
 
     updateTranscriptionProgress(progress) {
+        const progressContainer = document.getElementById('progress-container');
+        const progressFill = document.getElementById('progress-fill');
+        const progressText = document.getElementById('progress-text');
+        
+        // Handle new progress format with stages
+        if (progress.message) {
+            let displayText = progress.message;
+            
+            // Add sub-message if available
+            if (progress.subMessage && progress.subMessage.trim()) {
+                displayText += `\n${progress.subMessage}`;
+            }
+            
+            progressText.innerHTML = displayText.replace('\n', '<br>');
+            
+            // Show/hide progress bar based on completion
+            if (progress.isComplete) {
+                progressFill.style.width = '100%';
+                
+                // Auto-hide progress after completion
+                setTimeout(() => {
+                    this.hideTranscriptionProgress();
+                }, 1000);
+            } else {
+                // For non-deterministic stages (transcribing), don't show a progress bar
+                if (progress.showSpinner || 
+                    (progress.stages && progress.stages.some(s => s.status === 'active' && s.id === 'transcribing'))) {
+                    // Hide progress bar and add spinner class for animation
+                    progressContainer.classList.add('processing');
+                    progressFill.style.width = '0%';
+                } else {
+                    // Show progress for deterministic stages
+                    progressContainer.classList.remove('processing');
+                    const activeStageIndex = progress.stages ? progress.stages.findIndex(s => s.status === 'active') : -1;
+                    const stageProgress = activeStageIndex >= 0 ? ((activeStageIndex + 1) / progress.stages.length) * 100 : 25;
+                    progressFill.style.width = `${stageProgress}%`;
+                }
+            }
+            
+            // Add stage indicators if available
+            this.updateStageIndicators(progress.stages);
+        } else {
+            // Legacy format fallback
+            this.handleLegacyProgress(progress);
+        }
+    }
+
+    updateStageIndicators(stages) {
+        // Create or update stage indicators
+        let stageContainer = document.getElementById('stage-indicators');
+        
+        if (!stageContainer) {
+            stageContainer = document.createElement('div');
+            stageContainer.id = 'stage-indicators';
+            stageContainer.className = 'stage-indicators';
+            
+            const progressContainer = document.getElementById('progress-container');
+            progressContainer.appendChild(stageContainer);
+        }
+        
+        if (stages && stages.length > 0) {
+            stageContainer.style.display = 'flex';
+            stageContainer.innerHTML = stages.map(stage => 
+                `<div class="stage-indicator stage-${stage.status}">
+                    <span class="stage-icon">${stage.icon}</span>
+                    <span class="stage-name">${stage.name}</span>
+                </div>`
+            ).join('');
+        } else {
+            stageContainer.style.display = 'none';
+        }
+    }
+
+    handleLegacyProgress(progress) {
         const progressFill = document.getElementById('progress-fill');
         const progressText = document.getElementById('progress-text');
         
@@ -269,7 +343,6 @@ class DoctorDictateApp {
             case 'complete':
                 progressPercent = 100;
                 statusText = 'Finalizing...';
-                // Auto-hide progress after a brief moment
                 setTimeout(() => {
                     this.hideTranscriptionProgress();
                 }, 500);
@@ -668,15 +741,15 @@ class DoctorDictateApp {
     
     initializeModelToggle(models, current) {
         const toggle = document.getElementById('model-toggle');
-        // Set toggle based on current model - checked = high accuracy (large), unchecked = balanced (medium.en)
-        toggle.checked = current.model === 'large';
+        // Set toggle based on current model - checked = high accuracy (medium.en), unchecked = lower accuracy (small.en)
+        toggle.checked = current.model === 'medium.en';
         this.updateToggleInfo(toggle.checked);
     }
     
     updateModelInfo(currentModel) {
         // Update toggle state based on current model
         const toggle = document.getElementById('model-toggle');
-        toggle.checked = currentModel.model === 'large';
+        toggle.checked = currentModel.model === 'medium.en';
         this.updateToggleInfo(toggle.checked);
     }
     
@@ -687,7 +760,7 @@ class DoctorDictateApp {
     
     async toggleModel(isHighAccuracy) {
         try {
-            const selectedModel = isHighAccuracy ? 'large' : 'medium.en';
+            const selectedModel = isHighAccuracy ? 'medium.en' : 'small.en';
             const result = await window.electronAPI.setWhisperModel(selectedModel);
             if (result.success) {
                 this.updateToggleInfo(isHighAccuracy);

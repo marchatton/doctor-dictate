@@ -8,6 +8,8 @@ const path = require('path');
 const fs = require('fs');
 const medicalDictionary = require('./data/medical-dictionary.js');
 const { DictationCommandProcessor } = require('./dictation-commands.js');
+const { AudioProcessor } = require('./audio-processor.js');
+const { TranscriptionProgress } = require('./transcription-progress.js');
 
 class WhisperTranscriber {
     constructor() {
@@ -15,12 +17,13 @@ class WhisperTranscriber {
         this.pythonPath = 'python3'; // Will auto-detect or allow user config
         this.whisperEnvPath = null; // Path to Python venv with Whisper
         this.dictationProcessor = new DictationCommandProcessor();
+        this.audioProcessor = new AudioProcessor();
         
-        // Model configuration - default to highest quality
-        this.selectedModel = 'large'; // Default to maximum accuracy
+        // Model configuration - default to balanced performance
+        this.selectedModel = 'medium.en'; // Default to balanced speed/accuracy
         this.availableModels = {
-            'large': { name: 'High Accuracy', speed: 'Slower', accuracy: 'Best', size: '2.9 GB' },
-            'medium.en': { name: 'Balanced', speed: 'Fast', accuracy: 'High', size: '769 MB' }
+            'medium.en': { name: 'High Accuracy', speed: 'Fast', accuracy: 'High', size: '769 MB' },
+            'small.en': { name: 'Lower Accuracy', speed: 'Faster', accuracy: 'Good', size: '244 MB' }
         };
     }
 
@@ -105,23 +108,81 @@ class WhisperTranscriber {
         }
 
         this.isProcessing = true;
+        let processedAudio = null;
+        let progressTracker = null;
 
         try {
-            // Step 1: Run Whisper transcription
-            if (progressCallback) progressCallback({ stage: 'transcribing', progress: 0 });
+            // Initialize progress tracker with audio duration
+            const audioDuration = await this.audioProcessor.getAudioDuration(audioFilePath);
+            progressTracker = new TranscriptionProgress(audioDuration || 60);
+            progressTracker.setModel(this.selectedModel);
             
-            const rawTranscript = await this.runWhisper(audioFilePath, progressCallback);
+            // Stage 1: Preparing audio
+            progressTracker.nextStage('preparing');
+            if (progressCallback) {
+                progressCallback(progressTracker.getProgress());
+            }
             
-            if (progressCallback) progressCallback({ stage: 'processing', progress: 80 });
+            processedAudio = await this.audioProcessor.processAudio(
+                audioFilePath,
+                (stage, percent, message) => {
+                    // Update progress during preprocessing
+                    if (progressCallback && progressTracker) {
+                        progressCallback(progressTracker.getProgress('preprocessing', percent));
+                    }
+                }
+            );
 
-            // Step 2: Apply medical dictionary corrections
+            // Stage 2: Transcribing audio
+            progressTracker.nextStage('transcribing');
+            if (progressCallback) {
+                progressCallback(progressTracker.getProgress());
+            }
+            
+            const transcriptions = [];
+            const totalChunks = processedAudio.chunks.length;
+            
+            for (let i = 0; i < totalChunks; i++) {
+                const chunk = processedAudio.chunks[i];
+                const overallProgress = (i / totalChunks) * 100;
+                
+                if (progressCallback) {
+                    progressCallback(progressTracker.getProgress('transcribing', overallProgress));
+                }
+                
+                const chunkText = await this.runWhisper(chunk.path, null);
+                transcriptions.push({
+                    text: chunkText,
+                    overlap: chunk.overlap || 0,
+                    index: chunk.index
+                });
+            }
+            
+            // Combine chunk transcriptions
+            const rawTranscript = this.audioProcessor.combineTranscriptions(transcriptions);
+            
+            // Stage 3: Verifying medical terminology
+            progressTracker.nextStage('medical');
+            if (progressCallback) {
+                progressCallback(progressTracker.getProgress());
+            }
+
             const { correctedText, corrections, medicationsFound } = this.applyMedicalCorrections(rawTranscript);
+            const dictationResult = await this.dictationProcessor.processMedicalNote(correctedText);
             
-            // Step 3: Process dictation commands (next paragraph, comma, etc.)
-            if (progressCallback) progressCallback({ stage: 'formatting', progress: 90 });
-            const dictationResult = this.dictationProcessor.processMedicalNote(correctedText);
+            // Stage 4: Finalizing
+            progressTracker.nextStage('finalizing');
+            if (progressCallback) {
+                progressCallback(progressTracker.getProgress());
+            }
             
-            if (progressCallback) progressCallback({ stage: 'complete', progress: 100 });
+            // Cleanup temporary chunk files
+            await this.audioProcessor.cleanup(processedAudio.chunks);
+            
+            // Complete
+            if (progressCallback) {
+                progressCallback(progressTracker.complete());
+            }
 
             return {
                 raw: rawTranscript,
@@ -135,11 +196,19 @@ class WhisperTranscriber {
                     model: `whisper-${this.selectedModel}`,
                     modelInfo: this.availableModels[this.selectedModel],
                     audioFile: path.basename(audioFilePath),
+                    duration: processedAudio.duration,
+                    chunks: totalChunks,
                     correctionCount: corrections.length,
                     commandCount: dictationResult.commandCount
                 }
             };
 
+        } catch (error) {
+            // Cleanup on error
+            if (processedAudio && processedAudio.chunks) {
+                await this.audioProcessor.cleanup(processedAudio.chunks);
+            }
+            throw error;
         } finally {
             this.isProcessing = false;
         }
