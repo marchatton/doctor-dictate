@@ -592,6 +592,7 @@ summary:hover {
     justify-content: center;
     align-items: center;
     z-index: 1001;
+    padding: 2rem 1rem;
 }
 
 .modal-content {

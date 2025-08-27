@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Medical app specific components */
+@layer components {
+  .medical-card {
+    @apply bg-white rounded-xl shadow-medical border-0 backdrop-blur;
+  }
+  
+  .medical-gradient {
+    @apply bg-gradient-to-br from-stone-50 to-amber-50/20;
+  }
+  
+  .status-panel {
+    @apply space-y-4 p-8;
+  }
+  
+  .recording-button {
+    @apply gap-2 px-8 py-6 text-lg font-medium transition-transform hover:scale-105;
+  }
+  
+  .waveform-container {
+    @apply h-32 bg-stone-900/5 backdrop-blur relative overflow-hidden;
+  }
+  
+  .control-bar {
+    @apply flex items-center justify-center gap-4 p-6 bg-white/80 backdrop-blur;
+  }
+}

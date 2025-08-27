@@ -28,11 +28,7 @@ class DoctorDictateApp {
 
     async initializeApp() {
         try {
-            // Get app information
-            const appVersion = await window.electronAPI.getAppVersion();
-            
-            // Update UI with app info
-            document.getElementById('app-version').textContent = `v${appVersion}`;
+            // Get app information (no longer displaying version in header)
             
             // Ensure documents directory exists
             await window.electronAPI.ensureDocumentsDir();
@@ -53,8 +49,12 @@ class DoctorDictateApp {
     async initializeWhisper() {
         try {
             const statusElement = document.getElementById('app-status');
-            statusElement.textContent = 'Initializing Whisper...';
-            statusElement.className = 'status-loading';
+            const statusTitle = document.getElementById('status-title');
+            const statusSubtitle = document.getElementById('status-subtitle');
+            
+            statusElement.textContent = 'Initializing...';
+            statusTitle.textContent = 'Initializing whisper';
+            statusSubtitle.textContent = 'Setting up AI transcription...';
             
             // Initialize Whisper transcriber
             const initResult = await window.electronAPI.initializeWhisper();
@@ -65,24 +65,31 @@ class DoctorDictateApp {
                 
                 if (validationResult.available) {
                     this.whisperInitialized = true;
-                    statusElement.textContent = 'Ready';
-                    statusElement.className = 'status-online';
+                    statusElement.textContent = '';
+                    statusTitle.textContent = 'Ready to record';
+                    statusSubtitle.textContent = '10 minute maximum • Processes in ~2-3 minutes';
                     console.log('Whisper initialized and validated successfully');
                 } else {
-                    statusElement.textContent = 'Whisper Unavailable';
-                    statusElement.className = 'status-error';
+                    statusElement.textContent = 'Error';
+                    statusTitle.textContent = 'Whisper unavailable';
+                    statusSubtitle.textContent = 'Please ensure Whisper is properly installed';
                     this.showError('Whisper is not available. Please ensure it is properly installed.');
                 }
             } else {
-                statusElement.textContent = 'Whisper Failed';
-                statusElement.className = 'status-error';
+                statusElement.textContent = 'Error';
+                statusTitle.textContent = 'Whisper failed';
+                statusSubtitle.textContent = 'Failed to initialize transcription engine';
                 this.showError('Failed to initialize Whisper: ' + (initResult.error || 'Unknown error'));
             }
         } catch (error) {
             console.error('Failed to initialize Whisper:', error);
             const statusElement = document.getElementById('app-status');
+            const statusTitle = document.getElementById('status-title');
+            const statusSubtitle = document.getElementById('status-subtitle');
+            
             statusElement.textContent = 'Error';
-            statusElement.className = 'status-error';
+            statusTitle.textContent = 'Initialization error';
+            statusSubtitle.textContent = 'Unable to start transcription engine';
             this.showError('Error initializing Whisper');
         }
     }
@@ -141,8 +148,13 @@ class DoctorDictateApp {
             this.recordingStartTime = Date.now();
             this.microphoneStream = stream;
             
-            // Set up audio level monitoring
+            // Set up audio level monitoring and waveform
             this.setupAudioLevelMonitoring(stream);
+            
+            // Start waveform visualization
+            if (window.waveformVisualization) {
+                window.waveformVisualization.startRecording();
+            }
             
             // Update UI
             this.updateRecordingUI(true);
@@ -157,6 +169,7 @@ class DoctorDictateApp {
     }
 
     stopRecording() {
+        console.log('Stop recording button clicked');
         if (this.mediaRecorder && this.isRecording) {
             this.mediaRecorder.stop();
             this.isRecording = false;
@@ -169,6 +182,11 @@ class DoctorDictateApp {
             
             // Clean up audio monitoring
             this.stopAudioLevelMonitoring();
+            
+            // Stop waveform visualization
+            if (window.waveformVisualization) {
+                window.waveformVisualization.stopRecording();
+            }
             
             // Update UI
             this.updateRecordingUI(false);
@@ -288,6 +306,7 @@ class DoctorDictateApp {
             
             // Add stage indicators if available
             this.updateStageIndicators(progress.stages);
+            this.updateStageProgress(progress);
         } else {
             // Legacy format fallback
             this.handleLegacyProgress(progress);
@@ -317,6 +336,40 @@ class DoctorDictateApp {
             ).join('');
         } else {
             stageContainer.style.display = 'none';
+        }
+    }
+
+    updateStageProgress(progress) {
+        const processSteps = document.querySelectorAll('.process-step');
+        if (!processSteps.length) return;
+
+        // Map progress stages to our UI stages
+        const stageMapping = {
+            'preparing': 'audio',
+            'transcribing': 'transcribe', 
+            'medical': 'medical',
+            'finalizing': 'complete'
+        };
+
+        // Reset all to upcoming
+        processSteps.forEach(step => {
+            step.setAttribute('data-status', 'upcoming');
+        });
+
+        if (progress.stages) {
+            progress.stages.forEach(stage => {
+                const uiStage = stageMapping[stage.id];
+                if (uiStage) {
+                    const stepElement = document.querySelector(`.process-step[data-stage="${uiStage}"]`);
+                    if (stepElement) {
+                        if (stage.status === 'completed') {
+                            stepElement.setAttribute('data-status', 'done');
+                        } else if (stage.status === 'active') {
+                            stepElement.setAttribute('data-status', 'current');
+                        }
+                    }
+                }
+            });
         }
     }
 
@@ -373,30 +426,93 @@ class DoctorDictateApp {
     }
 
     completeTranscription(result) {
-        // Progress will auto-hide from the 'complete' stage update
-        // Just show the transcript editor
-        const transcriptEditor = document.getElementById('transcript-editor');
-        transcriptEditor.style.display = 'block';
+        // Hide all other sections and show the clean output screen
+        const recordingSection = document.querySelector('section[data-variant="medical"]');
+        const transcriptOutputScreen = document.getElementById('transcript-output-screen');
         
-        // Set transcript text (use formatted version with dictation commands processed)
-        const transcriptText = document.getElementById('transcript-text');
-        transcriptText.value = result.formatted || result.corrected || result.raw;
+        if (recordingSection) recordingSection.style.display = 'none';
+        if (transcriptOutputScreen) transcriptOutputScreen.style.display = 'block';
         
-        // Display transcription info
-        this.displayTranscriptionInfo(result);
+        // Populate the clean transcript
+        this.populateFinalTranscript(result);
         
-        console.log('Transcription completed with', result.corrections.length, 'corrections');
+        console.log('Transcription completed with', result.corrections?.length || 0, 'corrections');
+    }
+
+    populateFinalTranscript(result) {
+        // Populate transcript text
+        const finalTranscriptText = document.getElementById('final-transcript-text');
+        if (finalTranscriptText) {
+            finalTranscriptText.value = result.formatted || result.corrected || result.raw || '';
+        }
+        
+        // Populate metadata
+        const duration = document.getElementById('final-duration');
+        const model = document.getElementById('final-model');
+        const date = document.getElementById('final-date');
+        const corrections = document.getElementById('final-corrections');
+        const medicalTerms = document.getElementById('final-medical-terms');
+        const confidence = document.getElementById('final-confidence');
+        
+        // Calculate duration from start time
+        if (duration && this.recordingStartTime) {
+            const durationMs = Date.now() - this.recordingStartTime;
+            const minutes = Math.floor(durationMs / 60000);
+            const seconds = Math.floor((durationMs % 60000) / 1000);
+            duration.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        if (model) model.textContent = this.currentModel?.displayName || 'High accuracy';
+        if (date) date.textContent = new Date().toLocaleDateString();
+        if (corrections) corrections.textContent = result.corrections?.length || '0';
+        if (medicalTerms) medicalTerms.textContent = result.medications?.length || '0';
+        if (confidence) confidence.textContent = '95%'; // placeholder
+        
+        // Set up edit functionality
+        this.setupTranscriptActions();
+    }
+
+    setupTranscriptActions() {
+        const editBtn = document.getElementById('edit-transcript-btn');
+        const saveBtn = document.getElementById('save-transcript-btn');
+        const exportBtn = document.getElementById('export-transcript-btn');
+        const newRecordingBtn = document.getElementById('new-recording-btn');
+        const transcriptText = document.getElementById('final-transcript-text');
+        
+        if (editBtn && transcriptText) {
+            editBtn.addEventListener('click', () => {
+                transcriptText.readOnly = false;
+                transcriptText.focus();
+                editBtn.textContent = 'Done editing';
+            });
+        }
+        
+        if (newRecordingBtn) {
+            newRecordingBtn.addEventListener('click', () => {
+                this.startNewRecording();
+            });
+        }
+    }
+
+    startNewRecording() {
+        // Reset to initial state for new recording
+        const recordingSection = document.querySelector('section[data-variant="medical"]');
+        const transcriptOutputScreen = document.getElementById('transcript-output-screen');
+        
+        if (recordingSection) recordingSection.style.display = 'block';
+        if (transcriptOutputScreen) transcriptOutputScreen.style.display = 'none';
+        
+        // Reset UI state
+        this.updateRecordingUI(false);
+        
+        // Clear any previous data
+        this.currentTranscriptionResult = null;
     }
 
     displayTranscriptionInfo(result) {
-        // Create or update info panel
-        let infoPanel = document.getElementById('transcription-info');
-        if (!infoPanel) {
-            infoPanel = document.createElement('div');
-            infoPanel.id = 'transcription-info';
-            infoPanel.className = 'transcription-info';
-            document.getElementById('transcript-editor').insertBefore(infoPanel, document.getElementById('transcript-text'));
-        }
+        // For now, skip the detailed transcription info to avoid DOM errors
+        // We'll redesign this in the new clean layout
+        console.log('Transcription info available:', result);
         
         const corrections = result.corrections || [];
         const medications = result.medications || [];
@@ -463,16 +579,53 @@ class DoctorDictateApp {
     updateRecordingUI(isRecording) {
         const recordBtn = document.getElementById('record-btn');
         const stopBtn = document.getElementById('stop-btn');
-        const recordingIndicator = document.getElementById('recording-indicator');
+        const statusTitle = document.getElementById('status-title');
+        const statusSubtitle = document.getElementById('status-subtitle');
+        const waveformPlaceholder = document.getElementById('waveform-placeholder');
+        const modelToggle = document.getElementById('model-toggle');
+        const toggleContainer = document.querySelector('.px-4.py-3.bg-white\\/60');
         
         if (isRecording) {
+            recordBtn.style.display = 'none';
             recordBtn.disabled = true;
+            stopBtn.style.display = 'inline-flex';
             stopBtn.disabled = false;
-            recordingIndicator.style.display = 'block';
+            statusTitle.textContent = 'Recording...';
+            statusSubtitle.textContent = 'Speak clearly for best results';
+            if (waveformPlaceholder) waveformPlaceholder.style.display = 'none';
+            
+            // Lock the toggle during recording
+            if (modelToggle) {
+                modelToggle.disabled = true;
+            }
+            if (toggleContainer) {
+                toggleContainer.style.opacity = '0.6';
+                toggleContainer.style.pointerEvents = 'none';
+            }
+            
+            // Keep waveform canvas visible for real-time visualization
         } else {
+            recordBtn.style.display = 'inline-flex';
             recordBtn.disabled = false;
+            stopBtn.style.display = 'none';
             stopBtn.disabled = true;
-            recordingIndicator.style.display = 'none';
+            statusTitle.textContent = 'Ready to record';
+            statusSubtitle.textContent = '10 minute maximum • Processes in ~2-3 minutes';
+            if (waveformPlaceholder) waveformPlaceholder.style.display = 'flex';
+            
+            // Unlock the toggle when not recording
+            if (modelToggle) {
+                modelToggle.disabled = false;
+            }
+            if (toggleContainer) {
+                toggleContainer.style.opacity = '1';
+                toggleContainer.style.pointerEvents = 'auto';
+            }
+            
+            // Show waveform placeholder when not recording
+            if (window.waveformVisualization) {
+                window.waveformVisualization.showPlaceholder();
+            }
         }
     }
 
@@ -514,33 +667,42 @@ class DoctorDictateApp {
     }
 
     startAudioLevelAnimation() {
-        const levelBar = document.getElementById('level-bar');
-        const audioLevelMeter = document.getElementById('audio-level-meter');
+        const waveformPlaceholder = document.getElementById('waveform-placeholder');
+        if (waveformPlaceholder) {
+            waveformPlaceholder.style.display = 'none';
+        }
         
-        // Show the audio level meter
-        audioLevelMeter.style.display = 'flex';
-        
-        // Start animation loop
+        // Start animation loop with more responsive frequency analysis
         this.audioLevelInterval = setInterval(() => {
             if (this.analyser) {
                 const bufferLength = this.analyser.frequencyBinCount;
                 const dataArray = new Uint8Array(bufferLength);
                 this.analyser.getByteFrequencyData(dataArray);
                 
-                // Calculate average volume
+                // Calculate weighted average focusing on voice frequencies (200Hz-4kHz)
                 let sum = 0;
-                for (let i = 0; i < bufferLength; i++) {
+                let count = 0;
+                
+                // Focus on mid-range frequencies where human voice is most prominent
+                const startBin = Math.floor((200 / 22050) * bufferLength); // ~200Hz
+                const endBin = Math.floor((4000 / 22050) * bufferLength);   // ~4kHz
+                
+                for (let i = startBin; i < Math.min(endBin, bufferLength); i++) {
                     sum += dataArray[i];
+                    count++;
                 }
-                const average = sum / bufferLength;
                 
-                // Convert to percentage (0-100)
-                const percentage = Math.min(100, (average / 128) * 100);
+                const average = count > 0 ? sum / count : 0;
                 
-                // Update level bar
-                levelBar.style.width = `${percentage}%`;
+                // Convert to 0-1 range with better sensitivity for speech
+                const level = Math.min(1, Math.max(0, (average - 20) / 180));
+                
+                // Feed data to waveform visualization
+                if (window.waveformVisualization) {
+                    window.waveformVisualization.addAudioLevel(level);
+                }
             }
-        }, 50); // Update every 50ms for smooth animation
+        }, 33); // Update every 33ms (~30fps) for smoother animation
     }
 
     stopAudioLevelMonitoring() {
@@ -755,7 +917,18 @@ class DoctorDictateApp {
     
     updateToggleInfo(isHighAccuracy) {
         const modelInfo = document.getElementById('model-info');
-        modelInfo.textContent = isHighAccuracy ? 'High Accuracy (Slower)' : 'Balanced (Faster)';
+        const modelSubtitle = document.getElementById('model-subtitle');
+        const statusSubtitle = document.getElementById('status-subtitle');
+        
+        if (isHighAccuracy) {
+            modelInfo.textContent = 'High accuracy';
+            modelSubtitle.textContent = 'Slower';
+            if (statusSubtitle) statusSubtitle.textContent = '10 minute maximum • Processes in ~2-3 minutes';
+        } else {
+            modelInfo.textContent = 'Fast mode';
+            modelSubtitle.textContent = 'Faster';
+            if (statusSubtitle) statusSubtitle.textContent = '10 minute maximum • Processes in <1 min';
+        }
     }
     
     async toggleModel(isHighAccuracy) {
