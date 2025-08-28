@@ -28,8 +28,16 @@ function createWindow() {
     show: false, // Don't show until ready
   });
 
-  // Load the index.html file
-  mainWindow.loadFile(path.join(__dirname, 'index.html'));
+  // Load the React app (dev server in development, built files in production)
+  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  
+  if (isDev) {
+    mainWindow.loadURL('http://localhost:5173');
+    // Open DevTools in development
+    mainWindow.webContents.openDevTools();
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../dist-react/index.html'));
+  }
 
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
