@@ -48,16 +48,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showSuccess: (message) => ipcRenderer.invoke('show-success', message),
 });
 
-// Expose a safe version of console for debugging
-contextBridge.exposeInMainWorld('console', {
-  log: (...args) => console.log(...args),
-  warn: (...args) => console.warn(...args),
-  error: (...args) => console.error(...args),
-});
-
-// Expose process information for debugging
-contextBridge.exposeInMainWorld('process', {
+// Expose process information for debugging (don't override existing process)
+contextBridge.exposeInMainWorld('appInfo', {
   platform: process.platform,
   arch: process.arch,
-  version: process.version,
+  nodeVersion: process.version,
 });

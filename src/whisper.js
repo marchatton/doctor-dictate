@@ -107,6 +107,11 @@ class WhisperTranscriber {
             throw new Error('Already processing audio. Please wait.');
         }
 
+        // Validate Whisper environment is initialized before starting
+        if (!this.whisperEnvPath) {
+            throw new Error('Whisper environment not initialized. Please ensure initializeWhisper() was called successfully and whisper-testing/venv directory exists.');
+        }
+
         this.isProcessing = true;
         let processedAudio = null;
         let progressTracker = null;
@@ -220,6 +225,12 @@ class WhisperTranscriber {
      */
     async runWhisper(audioFilePath, progressCallback) {
         return new Promise((resolve, reject) => {
+            // Validate that Whisper environment is initialized
+            if (!this.whisperEnvPath) {
+                reject(new Error('Whisper environment not initialized. Please run initializeWhisper() first or ensure whisper-testing/venv exists.'));
+                return;
+            }
+
             const pythonExecutable = process.platform === 'win32' 
                 ? path.join(this.whisperEnvPath, 'Scripts', 'python.exe')
                 : path.join(this.whisperEnvPath, 'bin', 'python');

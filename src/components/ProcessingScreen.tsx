@@ -15,23 +15,27 @@ export function ProcessingScreen({
   const processingTime = isHighAccuracy ? 3 : 1;
   const PROCESSING_STEPS = [{
     id: 'audio',
-    label: 'Audio',
-    weight: 10,
-    estimatedTime: '~5 sec'
+    label: 'Preparing audio',
+    description: 'Converting format and optimizing for transcription',
+    weight: 15,
+    estimatedTime: '~10 sec'
   }, {
     id: 'transcribe',
-    label: 'Transcribe',
-    weight: 70,
-    estimatedTime: isHighAccuracy ? '~2 min' : '~30 sec',
+    label: 'Transcribing speech',
+    description: 'Using Whisper AI to convert speech to text',
+    weight: 65,
+    estimatedTime: isHighAccuracy ? '~90 sec' : '~30 sec',
     longStep: true
   }, {
     id: 'medical',
-    label: 'Medical terms',
+    label: 'Applying medical corrections',
+    description: 'Correcting medical terminology and formatting',
     weight: 15,
-    estimatedTime: '~15 sec'
+    estimatedTime: '~5 sec'
   }, {
     id: 'complete',
-    label: 'Complete',
+    label: 'Finalizing transcript',
+    description: 'Formatting and preparing for display',
     weight: 5,
     estimatedTime: '~2 sec'
   }];
@@ -69,7 +73,7 @@ export function ProcessingScreen({
         let status = 'pending';
         if (index < currentStep) status = 'completed';
         if (index === currentStep) status = 'processing';
-        return <div key={step.id} className={`flex items-center justify-between p-3 border-b border-stone-100 last:border-b-0 ${step.longStep ? 'bg-amber-50/50' : ''}`}>
+        return <div key={step.id} className="flex items-center justify-between p-3 border-b border-stone-100 last:border-b-0">
               <div className="flex items-center">
                 {status === 'completed' ? <CheckCircleIcon className="w-5 h-5 text-amber-700 mr-3" /> : status === 'processing' ? <div className="w-5 h-5 rounded-full border-2 border-[#6B1F1F] border-t-transparent animate-spin mr-3"></div> : <CircleIcon className="w-5 h-5 text-stone-300 mr-3" />}
                 <div>

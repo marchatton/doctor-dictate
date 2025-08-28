@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { EditIcon, SaveIcon, FileTextIcon, PlusIcon, CheckIcon, ClipboardIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { Modal } from './Modal';
+import { filterTemplate, extractMedications, countMedicalTerms, extractPatientName } from '../utils/templateFilter';
 
 declare global {
   interface Window {
@@ -10,40 +12,77 @@ declare global {
     };
   }
 }
+interface RecordingMetadata {
+  duration: number;
+  medicalTermsCount: number;
+  correctionsCount: number;
+  corrections: {original: string, corrected: string, context: string}[];
+  medications: string[];
+}
+
 interface TranscriptScreenProps {
   transcript: string;
   setTranscript: (value: string) => void;
   onNewRecording: () => void;
   patientName: string;
   isHighAccuracy: boolean;
+  recordingMetadata: RecordingMetadata;
 }
 export function TranscriptScreen({
   transcript,
   setTranscript,
   onNewRecording,
   patientName,
-  isHighAccuracy
+  isHighAccuracy,
+  recordingMetadata
 }: TranscriptScreenProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showCorrections, setShowCorrections] = useState(false);
+  const [showMedicalTerms, setShowMedicalTerms] = useState(false);
+  const [showMedications, setShowMedications] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  // Sample corrections data
-  const corrections = [{
-    original: 'serotonin',
-    corrected: 'sertraline',
-    context: 'Patient stable on sertraline 100mg daily...'
-  }, {
-    original: 'lamictal',
-    corrected: 'lamotrigine',
-    context: '...Continuing lamotrigine 200mg for mood stabilization.'
-  }];
-  // Function no longer highlights medical terms
-  const highlightMedicalTerms = (text: string) => {
-    return text;
+  
+  // Process transcript with template filtering
+  const filteredTranscript = useMemo(() => {
+    return filterTemplate(transcript, {
+      removeEmptySections: true,
+      removePlaceholders: true,
+      removeHeaders: false
+    });
+  }, [transcript]);
+  
+  // Extract additional metadata from transcript if not provided
+  const computedMetadata = useMemo(() => {
+    const medications = recordingMetadata.medications.length > 0 
+      ? recordingMetadata.medications 
+      : extractMedications(filteredTranscript); // Use filtered transcript
+    
+    const medicalTermsCount = recordingMetadata.medicalTermsCount > 0
+      ? recordingMetadata.medicalTermsCount
+      : countMedicalTerms(filteredTranscript); // Use filtered transcript
+    
+    return {
+      ...recordingMetadata,
+      medications,
+      medicalTermsCount
+    };
+  }, [filteredTranscript, recordingMetadata]);
+  
+  // Extract patient name from transcript
+  const actualPatientName = useMemo(() => {
+    const extractedName = extractPatientName(transcript);
+    return extractedName !== 'Unknown' ? extractedName : patientName;
+  }, [transcript, patientName]);
+  // Helper function to format duration
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
+  
   const handleCopyTranscript = () => {
-    navigator.clipboard.writeText(transcript);
+    navigator.clipboard.writeText(filteredTranscript);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -51,7 +90,7 @@ export function TranscriptScreen({
   const handleSaveTranscript = async () => {
     try {
       const filename = `transcript-${patientName.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.txt`;
-      await window.electronAPI?.saveTranscript({ filename, content: transcript });
+      await window.electronAPI?.saveTranscript({ filename, content: filteredTranscript });
     } catch (error) {
       console.error('Error saving transcript:', error);
     }
@@ -60,7 +99,7 @@ export function TranscriptScreen({
   const handleExportPDF = async () => {
     try {
       const filename = `transcript-${patientName.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
-      await window.electronAPI?.exportPDF({ filename, content: transcript });
+      await window.electronAPI?.exportPDF({ filename, content: filteredTranscript });
     } catch (error) {
       console.error('Error exporting PDF:', error);
     }
@@ -116,12 +155,12 @@ export function TranscriptScreen({
               <div className="flex justify-between items-center p-2 bg-white rounded-md">
                 <span className="text-stone-500">Patient:</span>
                 <span className="font-medium text-stone-800">
-                  {patientName}
+                  {actualPatientName}
                 </span>
               </div>
               <div className="flex justify-between items-center p-2 bg-white rounded-md">
                 <span className="text-stone-500">Duration:</span>
-                <span className="font-medium text-stone-800">01:25</span>
+                <span className="font-medium text-stone-800">{formatDuration(computedMetadata.duration)}</span>
               </div>
               <div className="flex justify-between items-center p-2 bg-white rounded-md">
                 <span className="text-stone-500">Date:</span>
@@ -142,44 +181,107 @@ export function TranscriptScreen({
               Processing
             </h3>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between items-center p-2 bg-white rounded-md">
-                <span className="text-stone-500">Medical terms:</span>
-                <span className="font-medium text-[#1B4332]">6 detected</span>
-              </div>
-              <div className="p-2 bg-white rounded-md cursor-pointer" onClick={() => setShowCorrections(!showCorrections)}>
+              {/* Medical Terms Dropdown */}
+              <div className="p-2 bg-white rounded-md cursor-pointer" onClick={() => setShowMedicalTerms(!showMedicalTerms)}>
                 <div className="flex justify-between items-center">
-                  <span className="text-stone-500">Corrections:</span>
+                  <span className="text-stone-500">Medical terms:</span>
                   <div className="flex items-center">
-                    <span className="font-medium text-stone-800 mr-1">
-                      2 applied
+                    <span className="font-medium text-[#1B4332] mr-1">
+                      {computedMetadata.medicalTermsCount} detected
                     </span>
-                    {showCorrections ? <ChevronUpIcon className="w-4 h-4 text-stone-500" /> : <ChevronDownIcon className="w-4 h-4 text-stone-500" />}
+                    {showMedicalTerms ? <ChevronUpIcon className="w-4 h-4 text-stone-500" /> : <ChevronDownIcon className="w-4 h-4 text-stone-500" />}
                   </div>
                 </div>
-                {showCorrections && <div className="mt-2 border-t border-stone-200 pt-2 space-y-2">
-                    {corrections.map((correction, index) => <div key={index} className="text-xs bg-stone-100 p-2 rounded">
-                        <div className="flex">
-                          <span className="line-through text-stone-500 mr-1">
-                            {correction.original}
-                          </span>
-                          <span className="text-[#1B4332]">
-                            → {correction.corrected}
-                          </span>
-                        </div>
-                        <div className="text-stone-600 mt-1 italic">
-                          "{correction.context}"
-                        </div>
-                      </div>)}
+                {showMedicalTerms && <div className="mt-2 border-t border-stone-200 pt-2 space-y-1">
+                    <div className="text-xs text-stone-600">Common medical terminology detected in transcript</div>
+                    <div className="text-xs bg-stone-100 p-2 rounded">
+                      Medical terms are automatically identified and verified against clinical dictionaries during transcription.
+                    </div>
                   </div>}
               </div>
+              
+              {/* Medications Dropdown */}
+              {computedMetadata.medications.length > 0 && (
+                <div className="p-2 bg-white rounded-md cursor-pointer" onClick={() => setShowMedications(!showMedications)}>
+                  <div className="flex justify-between items-center">
+                    <span className="text-stone-500">Medications:</span>
+                    <div className="flex items-center">
+                      <span className="font-medium text-[#1B4332] mr-1">
+                        {computedMetadata.medications.length} found
+                      </span>
+                      {showMedications ? <ChevronUpIcon className="w-4 h-4 text-stone-500" /> : <ChevronDownIcon className="w-4 h-4 text-stone-500" />}
+                    </div>
+                  </div>
+                  {showMedications && <div className="mt-2 border-t border-stone-200 pt-2 space-y-2">
+                      {computedMetadata.medications.map((medication, index) => (
+                        <div key={index} className="text-xs bg-stone-100 p-2 rounded">
+                          <span className="text-[#1B4332] font-medium">{medication}</span>
+                        </div>
+                      ))}
+                    </div>}
+                </div>
+              )}
+              
+              {/* Corrections Dropdown */}
+              {computedMetadata.corrections.length > 0 && (
+                <div className="p-2 bg-white rounded-md cursor-pointer" onClick={() => setShowCorrections(!showCorrections)}>
+                  <div className="flex justify-between items-center">
+                    <span className="text-stone-500">Corrections:</span>
+                    <div className="flex items-center">
+                      <span className="font-medium text-stone-800 mr-1">
+                        {computedMetadata.corrections.length} applied
+                      </span>
+                      {showCorrections ? <ChevronUpIcon className="w-4 h-4 text-stone-500" /> : <ChevronDownIcon className="w-4 h-4 text-stone-500" />}
+                    </div>
+                  </div>
+                  {showCorrections && <div className="mt-2 border-t border-stone-200 pt-2 space-y-2">
+                      {computedMetadata.corrections.map((correction, index) => (
+                        <div key={index} className="text-xs bg-stone-100 p-2 rounded">
+                          <div className="flex">
+                            <span className="line-through text-stone-500 mr-1">
+                              {correction.original}
+                            </span>
+                            <span className="text-[#1B4332]">
+                              → {correction.corrected}
+                            </span>
+                          </div>
+                          <div className="text-stone-600 mt-1 italic">
+                            "{correction.context}"
+                          </div>
+                        </div>
+                      ))}
+                    </div>}
+                </div>
+              )}
             </div>
           </div>
         </div>
         {/* Main transcript area */}
         <div className="w-full md:w-3/4 p-6">
-          {isEditing ? <textarea value={transcript} onChange={e => setTranscript(e.target.value)} className="w-full h-64 p-4 border border-stone-300 rounded-md focus:ring-2 focus:ring-[#6B1F1F] focus:border-[#6B1F1F] outline-none font-sans text-stone-800" placeholder="Edit your transcript here..." /> : <div className="w-full h-64 p-5 border border-stone-200 rounded-md bg-white overflow-y-auto font-sans text-stone-800 leading-relaxed" dangerouslySetInnerHTML={{
-          __html: highlightMedicalTerms(transcript)
-        }} />}
+          {isEditing ? (
+            <textarea 
+              value={transcript} 
+              onChange={e => setTranscript(e.target.value)} 
+              className="w-full h-64 p-4 border border-stone-300 rounded-md focus:ring-2 focus:ring-[#6B1F1F] focus:border-[#6B1F1F] outline-none font-sans text-stone-800" 
+              placeholder="Edit your transcript here..." 
+            />
+          ) : (
+            <div className="w-full h-64 p-5 border border-stone-200 rounded-md bg-white overflow-y-auto font-sans text-stone-800 leading-relaxed prose prose-stone max-w-none prose-headings:text-stone-900 prose-strong:text-stone-900 prose-p:text-stone-800 prose-li:text-stone-800">
+              <ReactMarkdown 
+                components={{
+                  h1: ({children}) => <h1 className="text-xl font-bold text-stone-900 mb-3">{children}</h1>,
+                  h2: ({children}) => <h2 className="text-lg font-semibold text-stone-900 mb-2">{children}</h2>,
+                  h3: ({children}) => <h3 className="text-base font-medium text-stone-900 mb-2">{children}</h3>,
+                  p: ({children}) => <p className="mb-2 text-stone-800 leading-relaxed">{children}</p>,
+                  ul: ({children}) => <ul className="mb-2 ml-4 list-disc text-stone-800">{children}</ul>,
+                  li: ({children}) => <li className="mb-1">{children}</li>,
+                  strong: ({children}) => <strong className="font-semibold text-stone-900">{children}</strong>
+                }}
+              >
+                {filteredTranscript}
+              </ReactMarkdown>
+            </div>
+          )}
           <div className="mt-8 text-center">
             <button onClick={() => setIsEditing(!isEditing)} className="flex items-center gap-2 bg-[#6B1F1F] hover:bg-[#5a1a1a] text-white py-3 px-6 rounded-full mx-auto transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
               <EditIcon className="w-4 h-4" />

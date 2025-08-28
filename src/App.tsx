@@ -9,9 +9,18 @@ export default function App() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [patientName, setPatientName] = useState('John Doe');
+  const [patientName, setPatientName] = useState('Unknown');
   const [processingStep, setProcessingStep] = useState('audio');
   const [processingProgress, setProcessingProgress] = useState(0);
+  
+  // Recording metadata
+  const [recordingMetadata, setRecordingMetadata] = useState({
+    duration: 0,
+    medicalTermsCount: 0,
+    correctionsCount: 0,
+    corrections: [] as {original: string, corrected: string, context: string}[],
+    medications: [] as string[]
+  });
   const handleStartRecording = () => {
     setIsRecording(true);
     // In a real app, we would start the actual recording here
@@ -31,8 +40,39 @@ export default function App() {
     setProcessingProgress(progress);
   };
 
-  const handleTranscriptionComplete = (transcriptText: string) => {
+  const handleTranscriptionComplete = (transcriptData: any) => {
+    // Handle both old string format and new object format
+    let transcriptText = '';
+    let metadata = {
+      duration: recordingTime,
+      medicalTermsCount: 0,
+      correctionsCount: 0,
+      corrections: [] as {original: string, corrected: string, context: string}[],
+      medications: [] as string[]
+    };
+    
+    if (typeof transcriptData === 'string') {
+      transcriptText = transcriptData;
+    } else if (transcriptData && typeof transcriptData === 'object') {
+      transcriptText = transcriptData.transcript || transcriptData.formatted || transcriptData.corrected || transcriptData.raw || '';
+      
+      // Extract metadata from backend result
+      if (transcriptData.corrections) {
+        metadata.corrections = transcriptData.corrections;
+        metadata.correctionsCount = transcriptData.corrections.length;
+      }
+      if (transcriptData.medications) {
+        metadata.medications = transcriptData.medications;
+        metadata.medicalTermsCount = transcriptData.medications.length;
+      }
+      if (transcriptData.metadata) {
+        metadata.duration = transcriptData.metadata.duration || recordingTime;
+        metadata.correctionsCount = transcriptData.metadata.correctionCount || metadata.correctionsCount;
+      }
+    }
+    
     setTranscript(transcriptText);
+    setRecordingMetadata(metadata);
     setCurrentScreen('transcript');
   };
   const handleNewRecording = () => {
@@ -52,7 +92,7 @@ export default function App() {
         <div className="transition-all duration-500 ease-in-out">
           {currentScreen === 'recording' && <RecordingScreen isHighAccuracy={isHighAccuracy} setIsHighAccuracy={setIsHighAccuracy} isRecording={isRecording} recordingTime={recordingTime} setRecordingTime={setRecordingTime} onStartRecording={handleStartRecording} onStopRecording={handleStopRecording} onTranscriptionComplete={handleTranscriptionComplete} onProcessingStart={handleProcessingStart} onProcessingProgress={handleProcessingProgress} />}
           {currentScreen === 'processing' && <ProcessingScreen isHighAccuracy={isHighAccuracy} processingStep={processingStep} processingProgress={processingProgress} />}
-          {currentScreen === 'transcript' && <TranscriptScreen transcript={transcript} setTranscript={setTranscript} onNewRecording={handleNewRecording} patientName={patientName} isHighAccuracy={isHighAccuracy} />}
+          {currentScreen === 'transcript' && <TranscriptScreen transcript={transcript} setTranscript={setTranscript} onNewRecording={handleNewRecording} patientName={patientName} isHighAccuracy={isHighAccuracy} recordingMetadata={recordingMetadata} />}
         </div>
       </main>
       <footer className="bg-stone-900 text-white py-5 text-center text-sm">

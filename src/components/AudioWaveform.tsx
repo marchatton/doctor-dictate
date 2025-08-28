@@ -8,59 +8,94 @@ export function AudioWaveform({
   isActive,
   audioStream
 }: AudioWaveformProps) {
-  const [bars, setBars] = useState<number[]>([]);
+  const [bars, setBars] = useState<number[]>([15, 20, 25, 20, 15]); // Lower default for better contrast
   const animationFrameRef = useRef<number>();
   const analyserRef = useRef<AnalyserNode>();
   const audioContextRef = useRef<AudioContext>();
 
   useEffect(() => {
     if (isActive && audioStream) {
-      // Create audio context and analyser
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const analyser = audioContext.createAnalyser();
-      const source = audioContext.createMediaStreamSource(audioStream);
+      console.log('AudioWaveform: Starting audio analysis with stream:', audioStream);
+      console.log('AudioWaveform: Stream tracks:', audioStream.getTracks());
       
-      analyser.fftSize = 64;
-      analyser.smoothingTimeConstant = 0.8;
-      source.connect(analyser);
-      
-      audioContextRef.current = audioContext;
-      analyserRef.current = analyser;
-      
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      
-      const updateBars = () => {
-        if (analyserRef.current) {
-          analyserRef.current.getByteFrequencyData(dataArray);
-          
-          // Take 5 frequency bands for visualization
-          const barCount = 5;
-          const newBars = [];
-          const bandSize = Math.floor(dataArray.length / barCount);
-          
-          for (let i = 0; i < barCount; i++) {
-            const start = i * bandSize;
-            const end = start + bandSize;
-            let sum = 0;
-            
-            for (let j = start; j < end; j++) {
-              sum += dataArray[j];
-            }
-            
-            const average = sum / bandSize;
-            const height = Math.max(5, Math.min(80, (average / 255) * 80));
-            newBars.push(height);
-          }
-          
-          setBars(newBars);
+      try {
+        // Create audio context and analyser
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        
+        // Resume context if it's suspended (required for some browsers)
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
         }
         
-        if (isActive) {
-          animationFrameRef.current = requestAnimationFrame(updateBars);
-        }
-      };
-      
-      updateBars();
+        const analyser = audioContext.createAnalyser();
+        const source = audioContext.createMediaStreamSource(audioStream);
+        
+        analyser.fftSize = 256; // Higher resolution for time domain
+        analyser.smoothingTimeConstant = 0.3; // Much less smoothing for responsiveness
+        source.connect(analyser);
+        
+        audioContextRef.current = audioContext;
+        analyserRef.current = analyser;
+        
+        console.log('AudioWaveform: AudioContext state:', audioContext.state);
+        
+        const bufferLength = analyser.fftSize;
+        const dataArray = new Uint8Array(bufferLength);
+        console.log('AudioWaveform: Audio context initialized, buffer length:', bufferLength);
+        
+        let frameCount = 0;
+        const updateBars = () => {
+          frameCount++;
+          if (analyserRef.current) {
+            // Use time domain data for better voice response
+            analyserRef.current.getByteTimeDomainData(dataArray);
+            
+            // Calculate RMS (Root Mean Square) for actual volume level
+            let sumSquares = 0;
+            for (let i = 0; i < bufferLength; i++) {
+              const normalized = (dataArray[i] - 128) / 128; // Normalize to -1 to 1
+              sumSquares += normalized * normalized;
+            }
+            const rms = Math.sqrt(sumSquares / bufferLength);
+            
+            // Convert RMS to a percentage (0-100)
+            // Amplify the signal for better visual response
+            const volumeLevel = Math.min(100, rms * 400);
+            
+            // Apply a noise gate - only show activity above threshold
+            const threshold = 5; // Minimum level to show activity
+            const gatedLevel = volumeLevel > threshold ? volumeLevel : volumeLevel * 0.3;
+            
+            // Reduced logging - only log occasionally for debugging
+            if (frameCount % 300 === 0) { // Log every 300 frames (much less frequent)
+              console.log('AudioWaveform: Frame:', frameCount, 'Volume:', volumeLevel.toFixed(1), '%');
+            }
+            
+            // Create dynamic bars with speech-responsive animation
+            // Center bar responds most, outer bars follow with slight delay
+            const baseHeight = Math.max(15, Math.min(95, gatedLevel));
+            
+            // Add organic variation that's proportional to volume
+            const variation = () => (Math.random() - 0.5) * (gatedLevel * 0.15);
+            
+            // Create symmetrical pattern with more dynamic range
+            const multipliers = [0.4, 0.7, 1.0, 0.7, 0.4];
+            const newBars = multipliers.map(mult => 
+              Math.max(10, Math.min(98, baseHeight * mult + variation()))
+            );
+            
+            setBars(newBars);
+          }
+          
+          if (isActive) {
+            animationFrameRef.current = requestAnimationFrame(updateBars);
+          }
+        };
+        
+        updateBars();
+      } catch (error) {
+        console.error('AudioWaveform: Error initializing audio analysis:', error);
+      }
       
       return () => {
         if (animationFrameRef.current) {
@@ -71,7 +106,7 @@ export function AudioWaveform({
         }
       };
     } else {
-      setBars([]);
+      setBars([15, 20, 25, 20, 15]); // Reset to lower default bars
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
@@ -87,13 +122,13 @@ export function AudioWaveform({
       </div>;
   }
   return <div className="flex items-center justify-center gap-4 h-full w-full px-8 py-4">
-      {bars.map((height, i) => <div key={i} className="flex items-end justify-center" style={{
+      {bars.map((height, i) => <div key={i} className="flex items-center justify-center" style={{
       height: '100%'
     }}>
           <div className="bg-[#6B1F1F] rounded-full" style={{
         height: `${height}%`,
         width: '8px',
-        transition: 'height 0.1s ease-in-out'
+        transition: 'height 0.05s ease-out' // Faster transition for more responsive feel
       }}></div>
         </div>)}
     </div>;

@@ -44,6 +44,18 @@ function createWindow() {
     mainWindow.show();
   });
 
+  // Set Content Security Policy for production
+  if (!isDev) {
+    mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': ["default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;"]
+        }
+      });
+    });
+  }
+
   // Handle window closed
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -55,8 +67,24 @@ function createWindow() {
   });
 }
 
-// This method will be called when Electron has finished initialization
-app.whenReady().then(createWindow);
+// Initialize the app when Electron is ready
+app.whenReady().then(async () => {
+  // Initialize Whisper environment first
+  try {
+    console.log('Initializing Whisper environment...');
+    const initResult = await whisperTranscriber.initializeWhisper();
+    if (initResult) {
+      console.log('Whisper environment initialized successfully');
+    } else {
+      console.warn('Whisper environment initialization failed - transcription may not work');
+    }
+  } catch (error) {
+    console.error('Failed to initialize Whisper during startup:', error);
+  }
+  
+  // Then create the window
+  createWindow();
+});
 
 // Quit when all windows are closed
 app.on('window-all-closed', () => {
@@ -289,7 +317,12 @@ ipcMain.handle('transcribe-audio', async (event, audioFilePath) => {
       event.sender.send('transcription-progress', progress);
     });
     
-    return { success: true, ...result };
+    // The frontend expects a 'transcript' property
+    return { 
+      success: true, 
+      transcript: result.formatted || result.corrected || result.raw,
+      ...result 
+    };
   } catch (error) {
     console.error('Error transcribing audio:', error);
     // Ensure processing state is reset on error
