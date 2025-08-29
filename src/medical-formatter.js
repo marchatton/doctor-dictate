@@ -72,19 +72,20 @@ class MedicalFormatter {
                     console.log('  Ollama output length:', ollamaResult.formatted?.length);
                     console.log('  Ollama preview:', ollamaResult.formatted?.substring(0, 100) + '...');
                     
-                    const isValid = this.validateNoHallucination(rawText, ollamaResult.formatted);
-                    console.log('  Hallucination check passed:', isValid);
-                    
-                    if (isValid) {
-                        console.log('🔍 MEDICAL FORMATTER - Using Ollama result');
-                        return {
-                            formatted: ollamaResult.formatted,
-                            improvements: this.getImprovements(true),
-                            method: 'ollama-strict'
-                        };
-                    } else {
-                        console.warn('🔍 MEDICAL FORMATTER - Ollama result failed hallucination check, using simple formatter');
+                    // Log any LLM notes separately (not in main output)
+                    if (ollamaResult.llmNotes) {
+                        console.log('  📝 LLM Notes:', ollamaResult.llmNotes);
                     }
+                    
+                    console.log('🔍 MEDICAL FORMATTER - Using Ollama result');
+                    return {
+                        formatted: ollamaResult.formatted,
+                        improvements: this.getImprovements(true),
+                        method: 'ollama-v2',
+                        promptVersion: ollamaResult.promptVersion,
+                        model: ollamaResult.model,
+                        processingNotes: ollamaResult.llmNotes
+                    };
                 }
             } catch (error) {
                 console.warn('🔍 MEDICAL FORMATTER - Ollama formatting failed:', error.message);
