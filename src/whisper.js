@@ -178,7 +178,13 @@ class WhisperTranscriber {
             }
             
             // Combine chunk transcriptions
+            console.log(`🔍 WHISPER - Combining ${transcriptions.length} chunks:`);
+            transcriptions.forEach((t, i) => {
+                console.log(`  Chunk ${i}: ${t.text.length} chars, overlap: ${t.overlap}`);
+                console.log(`    Preview: ${t.text.substring(0, 50)}...`);
+            });
             const rawTranscript = this.audioProcessor.combineTranscriptions(transcriptions);
+            console.log(`🔍 WHISPER - Combined transcript: ${rawTranscript.length} chars`);
             
             // Stage 3: Verifying medical terminology
             progressTracker.nextStage('medical');
