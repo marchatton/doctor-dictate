@@ -231,7 +231,7 @@ export function RecordingScreen({
 
   // Set Whisper model based on accuracy setting
   useEffect(() => {
-    const model = isHighAccuracy ? 'medium.en' : 'small.en';
+    const model = isHighAccuracy ? 'small.en' : 'tiny.en';
     window.electronAPI?.setWhisperModel(model);
   }, [isHighAccuracy]);
 

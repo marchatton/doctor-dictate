@@ -10,13 +10,13 @@ class TranscriptionProgress {
         
         // Baseline processing rates for different models
         this.processingRates = {
-            'medium.en': 0.5,  // ~0.5x realtime for medium model
-            'small.en': 0.3,   // ~0.3x realtime for small model
-            'base.en': 0.2     // ~0.2x realtime for base model
+            'small.en': 0.4,   // ~0.4x realtime for small model (high accuracy)
+            'tiny.en': 0.2,    // ~0.2x realtime for tiny model (fast)
+            'base.en': 0.3     // ~0.3x realtime for base model (fallback)
         };
         
-        // Default to medium model rate
-        this.baselineRate = this.processingRates['medium.en'];
+        // Default to small model rate (high accuracy default)
+        this.baselineRate = this.processingRates['small.en'];
         
         // Calculate estimated time with bounds
         this.estimatedSeconds = Math.ceil(audioDurationSeconds / this.baselineRate);

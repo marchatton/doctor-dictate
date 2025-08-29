@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { EditIcon, SaveIcon, FileTextIcon, PlusIcon, CheckIcon, ClipboardIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Modal } from './Modal';
-import { filterTemplate, extractMedications, countMedicalTerms, extractPatientName } from '../utils/templateFilter';
+import { filterTemplate, extractMedications, countMedicalTerms, extractMedicalTerms, extractPatientName } from '../utils/templateFilter';
 
 declare global {
   interface Window {
@@ -62,10 +62,13 @@ export function TranscriptScreen({
       ? recordingMetadata.medicalTermsCount
       : countMedicalTerms(filteredTranscript); // Use filtered transcript
     
+    const medicalTerms = extractMedicalTerms(filteredTranscript); // Extract actual terms
+    
     return {
       ...recordingMetadata,
       medications,
-      medicalTermsCount
+      medicalTermsCount,
+      medicalTerms
     };
   }, [filteredTranscript, recordingMetadata]);
   
@@ -192,11 +195,18 @@ export function TranscriptScreen({
                     {showMedicalTerms ? <ChevronUpIcon className="w-4 h-4 text-stone-500" /> : <ChevronDownIcon className="w-4 h-4 text-stone-500" />}
                   </div>
                 </div>
-                {showMedicalTerms && <div className="mt-2 border-t border-stone-200 pt-2 space-y-1">
-                    <div className="text-xs text-stone-600">Common medical terminology detected in transcript</div>
-                    <div className="text-xs bg-stone-100 p-2 rounded">
-                      Medical terms are automatically identified and verified against clinical dictionaries during transcription.
-                    </div>
+                {showMedicalTerms && <div className="mt-2 border-t border-stone-200 pt-2 space-y-2">
+                    {computedMetadata.medicalTerms.length > 0 ? (
+                      computedMetadata.medicalTerms.map((term, index) => (
+                        <div key={index} className="text-xs bg-stone-100 p-2 rounded">
+                          <span className="text-[#1B4332] font-medium">{term}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-xs text-stone-500 p-2 italic">
+                        No medical terms detected in this transcript
+                      </div>
+                    )}
                   </div>}
               </div>
               

@@ -179,23 +179,46 @@ export function extractMedications(text: string): string[] {
 }
 
 export function countMedicalTerms(text: string): number {
-  // Count potential medical terms (simplified)
-  const medicalPatterns = [
-    /\b(?:adhd|depression|anxiety|bipolar|ptsd|ocd)\b/gi,
-    /\b\w+\s+\d+\s*mg\b/gi,
-    /\b(?:diagnosis|symptoms|treatment|therapy|medication)\b/gi,
-    /\b(?:patient|clinical|medical|psychiatric)\b/gi
+  return extractMedicalTerms(text).length;
+}
+
+export function extractMedicalTerms(text: string): string[] {
+  // Extract medical terms but exclude medications (which have their own section)
+  const medicalTermPatterns = [
+    /\b(?:adhd|depression|anxiety|bipolar|ptsd|ocd|autism|schizophrenia|mania|hypomania|major depressive disorder)\b/gi,
+    /\b(?:diagnosis|psychotherapy|counseling)\b/gi,
+    /\b(?:psychiatric|psychological|mental health)\b/gi
   ];
   
-  let count = 0;
-  medicalPatterns.forEach(pattern => {
+  // Exclude medication-like patterns (these go in medications section)
+  const medicationPatterns = [
+    /\b\w+\s+\d+\s*mg\b/gi,
+    /\b(?:medication|meds|pills|dosage|prescription)\b/gi
+  ];
+  
+  const termsFound = new Set<string>();
+  
+  // Add medical terms
+  medicalTermPatterns.forEach(pattern => {
     const matches = text.match(pattern);
     if (matches) {
-      count += matches.length;
+      matches.forEach(match => {
+        termsFound.add(match.toLowerCase().trim());
+      });
     }
   });
   
-  return count;
+  // Remove any medication-related terms
+  medicationPatterns.forEach(pattern => {
+    const matches = text.match(pattern);
+    if (matches) {
+      matches.forEach(match => {
+        termsFound.delete(match.toLowerCase().trim());
+      });
+    }
+  });
+  
+  return Array.from(termsFound);
 }
 
 export function extractPatientName(text: string): string {
@@ -215,8 +238,12 @@ export function extractPatientName(text: string): string {
       const nameMatch = pattern.exec(text);
       if (nameMatch && nameMatch[1]) {
         const name = nameMatch[1].trim();
-        // Basic validation - should be 2-30 chars, not common words
-        const commonWords = ['patient', 'client', 'therapy', 'session', 'treatment', 'follow', 'up'];
+        // Basic validation - should be 2-30 chars, not common words  
+        const commonWords = ['patient', 'client', 'therapy', 'session', 'treatment', 'follow', 'up', 
+                            'improved', 'better', 'progress', 'reports', 'medication', 'anxiety', 
+                            'depression', 'symptoms', 'visit', 'appointment', 'doctor', 'psychiatrist',
+                            'mood', 'sleep', 'focus', 'school', 'work', 'home', 'family', 'stress',
+                            'improving', 'stable', 'control', 'current', 'continue', 'monitor'];
         if (name.length >= 2 && name.length <= 30 && !commonWords.includes(name.toLowerCase())) {
           return name;
         }

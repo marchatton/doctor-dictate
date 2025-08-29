@@ -91,7 +91,7 @@ export default function App() {
       <main className="flex-1 p-4 md:p-8 max-w-5xl mx-auto w-full">
         <div className="transition-all duration-500 ease-in-out">
           {currentScreen === 'recording' && <RecordingScreen isHighAccuracy={isHighAccuracy} setIsHighAccuracy={setIsHighAccuracy} isRecording={isRecording} recordingTime={recordingTime} setRecordingTime={setRecordingTime} onStartRecording={handleStartRecording} onStopRecording={handleStopRecording} onTranscriptionComplete={handleTranscriptionComplete} onProcessingStart={handleProcessingStart} onProcessingProgress={handleProcessingProgress} />}
-          {currentScreen === 'processing' && <ProcessingScreen isHighAccuracy={isHighAccuracy} processingStep={processingStep} processingProgress={processingProgress} />}
+          {currentScreen === 'processing' && <ProcessingScreen isHighAccuracy={isHighAccuracy} processingStep={processingStep} processingProgress={processingProgress} minutesProcessed={processingProgress / 100 * (recordingTime / 60)} totalMinutes={recordingTime / 60} />}
           {currentScreen === 'transcript' && <TranscriptScreen transcript={transcript} setTranscript={setTranscript} onNewRecording={handleNewRecording} patientName={patientName} isHighAccuracy={isHighAccuracy} recordingMetadata={recordingMetadata} />}
         </div>
       </main>

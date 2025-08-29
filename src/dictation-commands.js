@@ -271,13 +271,21 @@ class DictationCommandProcessor {
      * Enhanced with comprehensive medical formatting including Ollama LLM
      */
     async processMedicalNote(text) {
+        console.log('🔍 DICTATION PROCESSOR START:');
+        console.log('  Input text:', text.substring(0, 150) + '...');
+        
         // First pass: Handle dictation commands
+        console.log('🔍 DICTATION PROCESSOR - Processing commands...');
         const dictationResult = this.processCommands(text);
+        console.log('  After commands:', dictationResult.processed.substring(0, 150) + '...');
         
         // Second pass: Apply comprehensive medical formatting (now async for Ollama)
+        console.log('🔍 DICTATION PROCESSOR - Applying medical formatting...');
         const medicalResult = await this.medicalFormatter.formatMedicalNote(dictationResult.processed);
+        console.log('  Final result method:', medicalResult.method);
+        console.log('  Final result:', medicalResult.formatted.substring(0, 150) + '...');
         
-        return {
+        const finalOutput = {
             original: text,
             processed: medicalResult.formatted,
             commands: dictationResult.commands,
@@ -287,6 +295,10 @@ class DictationCommandProcessor {
             model: medicalResult.model,
             formatted: true
         };
+        
+        console.log('🔍 DICTATION PROCESSOR END - returning processed text of length:', finalOutput.processed.length);
+        
+        return finalOutput;
     }
     
     /**

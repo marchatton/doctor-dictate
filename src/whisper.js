@@ -19,11 +19,11 @@ class WhisperTranscriber {
         this.dictationProcessor = new DictationCommandProcessor();
         this.audioProcessor = new AudioProcessor();
         
-        // Model configuration - default to balanced performance
-        this.selectedModel = 'medium.en'; // Default to balanced speed/accuracy
+        // Model configuration - default to small for high accuracy
+        this.selectedModel = 'small.en'; // Default to high accuracy
         this.availableModels = {
-            'medium.en': { name: 'High Accuracy', speed: 'Fast', accuracy: 'High', size: '769 MB' },
-            'small.en': { name: 'Lower Accuracy', speed: 'Faster', accuracy: 'Good', size: '244 MB' }
+            'small.en': { name: 'High Accuracy', speed: 'Moderate', accuracy: 'High', size: '244 MB' },
+            'tiny.en': { name: 'Fast', speed: 'Fast', accuracy: 'Good', size: '39 MB' }
         };
     }
 
@@ -146,6 +146,8 @@ class WhisperTranscriber {
             
             const transcriptions = [];
             const totalChunks = processedAudio.chunks.length;
+            let lastSaveTime = Date.now();
+            const AUTOSAVE_INTERVAL = 30 * 1000; // 30 seconds
             
             for (let i = 0; i < totalChunks; i++) {
                 const chunk = processedAudio.chunks[i];
@@ -161,6 +163,18 @@ class WhisperTranscriber {
                     overlap: chunk.overlap || 0,
                     index: chunk.index
                 });
+                
+                // Auto-save progress every 30 seconds
+                const currentTime = Date.now();
+                if (currentTime - lastSaveTime > AUTOSAVE_INTERVAL) {
+                    try {
+                        const partialTranscript = this.audioProcessor.combineTranscriptions(transcriptions);
+                        await this.savePartialProgress(filePath, partialTranscript, i + 1, totalChunks);
+                        lastSaveTime = currentTime;
+                    } catch (error) {
+                        console.warn('Auto-save failed:', error.message);
+                    }
+                }
             }
             
             // Combine chunk transcriptions
@@ -188,6 +202,14 @@ class WhisperTranscriber {
             if (progressCallback) {
                 progressCallback(progressTracker.complete());
             }
+
+            console.log('🔍 WHISPER FINAL RESULT:');
+            console.log('  Raw transcript length:', rawTranscript.length);
+            console.log('  Corrected transcript length:', correctedText.length);
+            console.log('  Formatted transcript length:', dictationResult.processed.length);
+            console.log('  Raw:', rawTranscript.substring(0, 100) + '...');
+            console.log('  Corrected:', correctedText.substring(0, 100) + '...');
+            console.log('  Formatted:', dictationResult.processed.substring(0, 100) + '...');
 
             return {
                 raw: rawTranscript,
@@ -442,6 +464,67 @@ class WhisperTranscriber {
             });
         } catch (error) {
             return false;
+        }
+    }
+
+    /**
+     * Save partial transcription progress for recovery
+     * @param {string} originalFilePath - Original audio file path
+     * @param {string} partialTranscript - Current transcription progress
+     * @param {number} completedChunks - Number of chunks processed
+     * @param {number} totalChunks - Total number of chunks
+     * @private
+     */
+    async savePartialProgress(originalFilePath, partialTranscript, completedChunks, totalChunks) {
+        try {
+            const os = require('os');
+            const timestamp = Date.now();
+            const progressFile = path.join(os.tmpdir(), `doctordictate-progress-${timestamp}.json`);
+            
+            const progressData = {
+                originalFile: originalFilePath,
+                transcript: partialTranscript,
+                completedChunks,
+                totalChunks,
+                progress: Math.round((completedChunks / totalChunks) * 100),
+                timestamp: new Date().toISOString(),
+                model: this.selectedModel
+            };
+            
+            fs.writeFileSync(progressFile, JSON.stringify(progressData, null, 2));
+            console.log(`Auto-saved progress: ${completedChunks}/${totalChunks} chunks (${progressData.progress}%)`);
+            
+            // Clean up old progress files (keep only last 3)
+            this.cleanupOldProgressFiles();
+            
+        } catch (error) {
+            console.warn('Failed to save progress:', error.message);
+        }
+    }
+
+    /**
+     * Clean up old progress files to prevent disk clutter
+     * @private
+     */
+    cleanupOldProgressFiles() {
+        try {
+            const os = require('os');
+            const tmpDir = os.tmpdir();
+            const progressFiles = fs.readdirSync(tmpDir)
+                .filter(file => file.startsWith('doctordictate-progress-'))
+                .map(file => ({
+                    name: file,
+                    path: path.join(tmpDir, file),
+                    mtime: fs.statSync(path.join(tmpDir, file)).mtime
+                }))
+                .sort((a, b) => b.mtime - a.mtime); // newest first
+            
+            // Keep only the 3 most recent progress files
+            for (let i = 3; i < progressFiles.length; i++) {
+                fs.unlinkSync(progressFiles[i].path);
+            }
+        } catch (error) {
+            // Silent cleanup failure - not critical
         }
     }
 }

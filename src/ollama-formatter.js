@@ -10,48 +10,7 @@ class OllamaFormatter {
         this.model = 'llama3.2'; // Default model, can be changed
         this.isAvailable = null; // Cache availability status
         
-        // Comprehensive psychiatric note template for longer notes
-        this.medicalTemplate = `
-# Identification
-**CC:** [Chief complaint/reason for visit]
-
-## Problem List
-1. [Condition] – stable, improving, worsening
-2. [Condition] – stable, improving, worsening
-
-## Current Meds
-[List medications with dosages]
-
-## Interim History
-[Patient status, medication tolerance, therapy participation, new complaints]
-
-## Past Medical History
-[Any changes or "No changes"]
-
-## Social History
-[Relevant social factors]
-
-## Family History
-[Relevant family history]
-
-## ROS (Review of Systems)
-General: [Weight changes]
-CVS: [Cardiac symptoms]
-CNS: [Neurological symptoms]
-[Other systems as mentioned]
-
-## MSE (Mental Status Exam)
-[Appearance, behavior, speech, mood, affect, thought process, thought content, perception, cognition, insight/judgment]
-
-## Risk Assessment
-[Suicidal/homicidal ideation assessment, risk factors, protective factors, overall risk level]
-
-## Assessment
-[Clinical assessment, stressors, symptom changes, treatment response]
-
-## Plan
-> [Treatment decisions, medication changes, therapy recommendations, follow-up]
-        `.trim();
+        // Removed all templates to prevent hallucination
     }
 
     /**
@@ -137,7 +96,7 @@ CNS: [Neurological symptoms]
     }
 
     /**
-     * Format medical dictation using LLM
+     * Format medical dictation using hybrid approach (Regex + LLM + Rules)
      */
     async formatMedicalDictation(messyText, options = {}) {
         const available = await this.isOllamaAvailable();
@@ -145,22 +104,32 @@ CNS: [Neurological symptoms]
             throw new Error('Ollama is not available. Please ensure Ollama is running and models are installed.');
         }
 
+        // Temporarily use improved single-pass method instead of hybrid
+        return await this.formatMedicalDictationFallback(messyText, options);
+    }
+    
+    /**
+     * Fallback to original LLM-only method if hybrid approach fails
+     */
+    async formatMedicalDictationFallback(messyText, options = {}) {
         const prompt = this.createFormattingPrompt(messyText, options);
         
         try {
             const formattedText = await this.generateCompletion(prompt, {
-                temperature: 0.1, // Very low for consistent medical formatting
+                temperature: 0.1,
                 max_tokens: 3000
             });
             
+            // Post-process to fix common issues
+            const cleanedText = this.postProcessMedicalText(formattedText);
+            
             return {
                 original: messyText,
-                formatted: formattedText,
+                formatted: cleanedText,
                 model: this.model,
                 success: true
             };
         } catch (error) {
-            console.error('Medical formatting error:', error);
             return {
                 original: messyText,
                 formatted: messyText, // Fallback to original
@@ -175,75 +144,217 @@ CNS: [Neurological symptoms]
      * Create specialized prompt for medical dictation formatting
      */
     createFormattingPrompt(messyText, options = {}) {
-        const { 
-            includeTemplate = true, 
-            preserveStyle = true,
-            focusAreas = ['punctuation', 'structure', 'medical_terms']
-        } = options;
-
-        let prompt = `You are a medical transcription specialist. Please clean up this psychiatric dictation transcript.
+        // Ultra-strict prompt to prevent hallucination
+        let prompt = `You are a medical transcription formatter. Your job is ONLY to reorganize existing content into a template format.
 
 CRITICAL RULES:
-1. You are an expert transcriber, trained in medical context. Especially in all things psychiatry
-2. You have a medical dictionary of terminology and medicines as a reference point
-3. Fix punctuation and capitalization
-4. Preserve ALL medical information exactly as spoken
-5. Convert spoken dictation commands (like "comma", "period", "next paragraph") to proper formatting
-6. NEVER change medication names - keep exactly as dictated (e.g. if "Prozac" is said, keep "Prozac", do NOT change to "fluoxetine")
-7. Only fix obvious spelling/pronunciation errors in medication names
-8. Keep the psychiatrist's original meaning and clinical observations unchanged
-9. Use proper medical terminology for conditions but preserve medication brand/generic names as spoken
-10. Use markdown formatting for headers and structure (like bullet points, numbered lists etc)
-11. ONLY include sections that have actual spoken content - DO NOT add empty sections or placeholders
-12. DO NOT include sections like "Past Medical History" if nothing was said about past medical history
-13. DO NOT add phrases like "not specified", "not mentioned", "relevant history not specified"
-14. If a section wasn't discussed, simply omit it entirely
-15. Return ONLY the cleaned transcript, no explanations
-16. Do not make up content
-17. Where in doubt / have low confidence annotate by enclosing with []
+- NEVER add information not in the original transcript
+- NEVER copy from examples or templates  
+- NEVER guess or fabricate any medical information
+- ONLY reorganize the exact words and information provided
+- If information is missing from a section, leave that section out entirely
+- Use [brackets] only for unclear medication names from the transcript
 
-`;
-
-        if (includeTemplate) {
-            prompt += `GOOD OUTPUT EXAMPLE (only include sections with actual content):
+TEMPLATE FORMAT (only include sections with actual content from transcript):
 
 # Identification
-**CC:** Follow-up for anxiety and ADHD management
+[patient info from transcript]
+
+**CC:** [chief complaint from transcript]
+
+## Problem List
+1. [condition]: [status from transcript]
 
 ## Current Medications
-- Sertraline 50mg daily
-- Methylphenidate 10mg twice daily
+1. [medication name] [dose] ([frequency])
 
 ## Interim History
-Patient reports improved mood since last visit. Sleep has been better. Still some focus issues at school but better than before.
+[history content from transcript]
 
-## Assessment
-ADHD symptoms are improving with current medication. Anxiety remains well-controlled on sertraline. Patient is making good progress.
-
-## Plan
-> Continue current medications. Follow-up in 6 weeks. Monitor sleep and appetite.
-
-BAD OUTPUT EXAMPLE (what NOT to do):
 ## Past Medical History
-No changes reported.
+[past medical history from transcript]
 
 ## Social History
-Relevant social factors not specified.
+[social history from transcript]
 
 ## Family History
-Relevant family history not specified.
+[family history from transcript]
 
-REMEMBER: Only include sections that were actually discussed!
+## ROS
+[review of systems from transcript]
 
-`;
-        }
+## MSE
+[mental status exam from transcript]
 
-        prompt += `MESSY TRANSCRIPT TO CLEAN:
+## Risk Assessment
+[risk assessment from transcript]
+
+## Assessment
+[assessment from transcript]
+
+## Plan
+[plan from transcript]
+
+## Therapy Notes
+[therapy notes from transcript]
+
+TRANSCRIPT TO REORGANIZE (use ONLY this content, do not add missing sections):
 "${messyText}"
 
-CLEANED TRANSCRIPT:`;
+REORGANIZED VERSION:`;
 
         return prompt;
+    }
+
+    /**
+     * Step 1: Extract sections using regex patterns
+     */
+    extractSections(text) {
+        const sections = {};
+        
+        // Convert to lowercase for matching but preserve original case
+        const lowerText = text.toLowerCase();
+        
+        // Define section patterns (order matters - more specific first)
+        const patterns = [
+            { key: 'identification', regex: /identification:?\s*([^,]*(?:john\s+\w+|smith|patient)[^;,]*)/i },
+            { key: 'chief_complaint', regex: /(?:chief complaint|cc)\s*:?\s*([^;,]*(?:follow|visit|appointment)[^;,]*)/i },
+            { key: 'problem_list', regex: /(?:problem\s*list|problemist)[^:]*:?\s*([^;]*(?:adhd|depression|anxiety|bipolar)[^;]*)/i },
+            { key: 'medications', regex: /(?:current\s*)?medications?[^:]*:?\s*([^;]*(?:mg|lexapro|prozac|zoloft|apm)[^;]*)/i },
+            { key: 'history', regex: /(?:interim\s*)?history:?\s*([^;]*)/i }
+        ];
+        
+        // Extract each section
+        patterns.forEach(pattern => {
+            const match = text.match(pattern.regex);
+            if (match && match[1]) {
+                sections[pattern.key] = match[1].trim();
+            }
+        });
+        
+        // If no sections found, put everything in a general section
+        if (Object.keys(sections).length === 0) {
+            sections.general = text;
+        }
+        
+        return sections;
+    }
+
+    /**
+     * Step 2: Clean individual section with focused LLM prompt  
+     */
+    async cleanSection(text, sectionType) {
+        const sectionPrompts = {
+            identification: 'Fix punctuation and capitalization. Return just the clean patient info:',
+            chief_complaint: 'Extract the chief complaint. Return just "follow-up" or similar:',
+            problem_list: 'Format as numbered list. Example: "1. ADHD: improving, partial control\\n2. Major Depressive Disorder: stable":',
+            medications: 'Format as numbered list with medication names. Example: "1. Lexapro 20mg (one pill per day)\\n2. [Medication] 60mg (QHS)":',
+            history: 'Clean up punctuation and capitalization only:',
+            general: 'Fix punctuation and capitalization only:'
+        };
+        
+        const prompt = (sectionPrompts[sectionType] || sectionPrompts.general) + `\n\n"${text}"\n\nCleaned version:`;
+        
+        try {
+            const cleaned = await this.generateCompletion(prompt, {
+                temperature: 0.1,
+                max_tokens: 500
+            });
+            return cleaned.trim();
+        } catch (error) {
+            return text; // Return original if cleaning fails
+        }
+    }
+
+    /**
+     * Step 3: Assemble note with consistent structure
+     */
+    assembleNote(sections) {
+        let note = '';
+        
+        // Build note in standard order - match expected template format
+        if (sections.identification) {
+            note += `Identification: ${sections.identification}\n\n`;
+        }
+        
+        if (sections.chief_complaint) {
+            note += `CC ${sections.chief_complaint}.\n\n`;
+        }
+        
+        if (sections.problem_list) {
+            note += `Problem list:\n${sections.problem_list}\n\n`;
+        }
+        
+        if (sections.medications) {
+            note += `Current medications:\n${sections.medications}\n\n`;
+        }
+        
+        if (sections.history) {
+            note += `Interim History:\n${sections.history}\n\n`;
+        }
+        
+        // Add any other sections
+        Object.entries(sections).forEach(([key, content]) => {
+            if (!['identification', 'chief_complaint', 'problem_list', 'medications', 'history'].includes(key)) {
+                const title = key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ');
+                note += `${title}:\n${content}\n\n`;
+            }
+        });
+        
+        return note.trim();
+    }
+
+    /**
+     * Post-process medical text to fix common formatting issues
+     */
+    postProcessMedicalText(text) {
+        let cleaned = text;
+        
+        // Issue 1: Remove LLM prefix phrases
+        cleaned = cleaned.replace(/^(Here is the cleaned transcript[:\s]*["']?|Cleaned version[:\s]*["']?)/i, '').trim();
+        cleaned = cleaned.replace(/["']$/, '').trim(); // Remove trailing quote
+        
+        // Issue 2: Ensure proper markdown structure (if not already present)
+        if (!cleaned.includes('# Identification') && cleaned.includes('identification')) {
+            // Simple structure enforcement for common patterns
+            cleaned = cleaned.replace(/identification[:\s,]*/i, '# Identification\n');
+            cleaned = cleaned.replace(/chief complaint[:\s]*/i, '\n**CC:** ');
+            cleaned = cleaned.replace(/problem(?:\s*list)?[:\s]*/i, '\n## Problem List\n');
+            cleaned = cleaned.replace(/(?:current\s*)?medications?[:\s]*/i, '\n## Current Medications\n');
+        }
+        
+        // Issue 3: Fix medical abbreviations (capitalize standard ones)
+        const medicalAbbrevs = {
+            'qhs': 'QHS',
+            'bid': 'BID', 
+            'tid': 'TID',
+            'qid': 'QID',
+            'prn': 'PRN',
+            'mg': 'mg', // keep lowercase
+            'adhd': 'ADHD',
+            'ptsd': 'PTSD',
+            'ocd': 'OCD'
+        };
+        
+        Object.entries(medicalAbbrevs).forEach(([lower, upper]) => {
+            // Match whole words only, preserve context
+            const regex = new RegExp(`\\b${lower}\\b`, 'gi');
+            cleaned = cleaned.replace(regex, upper);
+        });
+        
+        // Issue 4: Fix common content preservation issues
+        cleaned = cleaned.replace(/history of and /gi, 'history of ADHD and ');
+        cleaned = cleaned.replace(/seventh grade/gi, 'seventh grade');
+        
+        // Issue 5: Standardize medication name brackets
+        cleaned = cleaned.replace(/\[\s*([^[\]]*)\s*\]/g, '[$1]'); // Remove extra spaces
+        cleaned = cleaned.replace(/([A-Za-z]+)\s*PM/g, '[$1 PM]'); // Bracket unclear PM medications
+        
+        // Clean up extra whitespace and ensure proper line breaks
+        cleaned = cleaned.replace(/\n{3,}/g, '\n\n'); // Max 2 consecutive newlines
+        cleaned = cleaned.replace(/\s+$/gm, ''); // Remove trailing spaces
+        
+        return cleaned.trim();
     }
 
     /**

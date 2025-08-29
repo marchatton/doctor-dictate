@@ -14,9 +14,9 @@ export function AudioWaveform({
   const audioContextRef = useRef<AudioContext>();
 
   useEffect(() => {
+    console.log('AudioWaveform useEffect:', { isActive, hasAudioStream: !!audioStream });
     if (isActive && audioStream) {
-      console.log('AudioWaveform: Starting audio analysis with stream:', audioStream);
-      console.log('AudioWaveform: Stream tracks:', audioStream.getTracks());
+      // Audio analysis starting - logging removed for production
       
       try {
         // Create audio context and analyser
@@ -37,11 +37,8 @@ export function AudioWaveform({
         audioContextRef.current = audioContext;
         analyserRef.current = analyser;
         
-        console.log('AudioWaveform: AudioContext state:', audioContext.state);
-        
         const bufferLength = analyser.fftSize;
         const dataArray = new Uint8Array(bufferLength);
-        console.log('AudioWaveform: Audio context initialized, buffer length:', bufferLength);
         
         let frameCount = 0;
         const updateBars = () => {
@@ -66,10 +63,7 @@ export function AudioWaveform({
             const threshold = 5; // Minimum level to show activity
             const gatedLevel = volumeLevel > threshold ? volumeLevel : volumeLevel * 0.3;
             
-            // Reduced logging - only log occasionally for debugging
-            if (frameCount % 300 === 0) { // Log every 300 frames (much less frequent)
-              console.log('AudioWaveform: Frame:', frameCount, 'Volume:', volumeLevel.toFixed(1), '%');
-            }
+            // Logging disabled for cleaner console output
             
             // Create dynamic bars with speech-responsive animation
             // Center bar responds most, outer bars follow with slight delay
