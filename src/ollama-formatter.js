@@ -10,13 +10,17 @@ const { ContentVerifier } = require('./content-verifier');
 const fs = require('fs');
 
 class OllamaFormatter {
-    constructor() {
+    constructor(config = {}) {
         this.baseUrl = 'http://localhost:11434';
-        this.model = this.selectOptimalModel(); // Auto-select based on availability
+        // Allow model override from config, otherwise auto-select
+        this.model = config.model || this.selectOptimalModel();
         this.isAvailable = null; // Cache availability status
-        this.temperature = 0.1; // Slight variation, not zero (prevents repetition)
+        this.temperature = config.temperature || 0.1; // Slight variation, not zero (prevents repetition)
         this.maxRetries = 2; // Number of retries for hallucination issues
         this.contentVerifier = new ContentVerifier(); // Content verification system
+        
+        // Store config for dynamic adjustment
+        this.config = config;
     }
     
     /**
