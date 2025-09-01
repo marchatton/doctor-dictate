@@ -43,6 +43,7 @@ export function RecordingScreen({
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const mimeTypeRef = useRef<string>('audio/webm');
   
   // Store callbacks in refs to prevent re-initialization
   const onTranscriptionCompleteRef = useRef(onTranscriptionComplete);
@@ -77,8 +78,33 @@ export function RecordingScreen({
         console.log('Microphone access granted, stream:', stream);
         
         setAudioStream(stream);
-        const recorder = new MediaRecorder(stream);
-        console.log('MediaRecorder created:', recorder);
+        
+        // Check for supported MIME types and use the best available
+        const mimeTypes = [
+          'audio/webm;codecs=opus',
+          'audio/webm',
+          'audio/ogg;codecs=opus',
+          'audio/mp4',
+          'audio/mpeg'
+        ];
+        
+        let selectedMimeType = 'audio/webm'; // default fallback
+        for (const mimeType of mimeTypes) {
+          if (MediaRecorder.isTypeSupported(mimeType)) {
+            selectedMimeType = mimeType;
+            console.log('Selected MIME type:', selectedMimeType);
+            break;
+          }
+        }
+        
+        const recorder = new MediaRecorder(stream, {
+          mimeType: selectedMimeType,
+          audioBitsPerSecond: 128000 // 128 kbps for good quality
+        });
+        console.log('MediaRecorder created with MIME type:', selectedMimeType, recorder);
+        
+        // Store the selected MIME type for later use when creating the Blob
+        mimeTypeRef.current = selectedMimeType;
         
         recorder.ondataavailable = (event) => {
           console.log('Audio data available, size:', event.data.size);
@@ -96,7 +122,7 @@ export function RecordingScreen({
             return;
           }
           
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const audioBlob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current });
           console.log('Audio blob size:', audioBlob.size);
           const arrayBuffer = await audioBlob.arrayBuffer();
           console.log('Array buffer size:', arrayBuffer.byteLength);
@@ -284,10 +310,20 @@ export function RecordingScreen({
           <button 
             onClick={() => {
               if (mediaRecorder && mediaRecorder.state === 'inactive') {
-                audioChunksRef.current = []; // Clear any previous chunks
-                mediaRecorder.start(1000); // Collect data every second
-                onStartRecording();
-                console.log('Started recording with MediaRecorder');
+                try {
+                  audioChunksRef.current = []; // Clear any previous chunks
+                  mediaRecorder.start(1000); // Collect data every second
+                  onStartRecording();
+                  console.log('Started recording with MediaRecorder, state:', mediaRecorder.state);
+                } catch (error) {
+                  console.error('Failed to start MediaRecorder:', error);
+                  alert('Failed to start recording. Please check microphone permissions and try again.');
+                }
+              } else {
+                console.warn('MediaRecorder not ready:', {
+                  exists: !!mediaRecorder,
+                  state: mediaRecorder?.state
+                });
               }
             }} 
             className="flex items-center gap-2 bg-[#6B1F1F] hover:bg-[#5a1a1a] text-white py-4 px-10 rounded-full text-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"

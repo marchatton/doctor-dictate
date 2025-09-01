@@ -19,12 +19,28 @@ export function AudioWaveform({
       // Audio analysis starting - logging removed for production
       
       try {
+        // Verify audio stream has active tracks
+        const audioTracks = audioStream.getAudioTracks();
+        console.log('Audio tracks:', audioTracks.map(t => ({ 
+          enabled: t.enabled, 
+          muted: t.muted, 
+          readyState: t.readyState,
+          label: t.label 
+        })));
+        
+        if (audioTracks.length === 0 || !audioTracks.some(t => t.enabled)) {
+          console.error('No active audio tracks in stream');
+          return;
+        }
+        
         // Create audio context and analyser
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         
         // Resume context if it's suspended (required for some browsers)
         if (audioContext.state === 'suspended') {
-          audioContext.resume();
+          audioContext.resume().then(() => {
+            console.log('AudioContext resumed successfully');
+          });
         }
         
         const analyser = audioContext.createAnalyser();
@@ -41,64 +57,78 @@ export function AudioWaveform({
         const dataArray = new Uint8Array(bufferLength);
         
         let frameCount = 0;
+        let isRunning = true; // Local flag to control the loop
+        
         const updateBars = () => {
           frameCount++;
-          if (analyserRef.current) {
-            // Use time domain data for better voice response
-            analyserRef.current.getByteTimeDomainData(dataArray);
-            
-            // Calculate RMS (Root Mean Square) for actual volume level
-            let sumSquares = 0;
-            for (let i = 0; i < bufferLength; i++) {
-              const normalized = (dataArray[i] - 128) / 128; // Normalize to -1 to 1
-              sumSquares += normalized * normalized;
+          
+          // Always try to get audio data if analyser exists
+          if (analyserRef.current && isRunning) {
+            try {
+              // Use time domain data for better voice response
+              analyserRef.current.getByteTimeDomainData(dataArray);
+              
+              // Calculate RMS (Root Mean Square) for actual volume level
+              let sumSquares = 0;
+              for (let i = 0; i < bufferLength; i++) {
+                const normalized = (dataArray[i] - 128) / 128; // Normalize to -1 to 1
+                sumSquares += normalized * normalized;
+              }
+              const rms = Math.sqrt(sumSquares / bufferLength);
+              
+              // Convert RMS to a percentage (0-100)
+              // Increased amplification for better visual response
+              const volumeLevel = Math.min(100, rms * 500);
+              
+              // Lower threshold for more responsive visualization
+              const threshold = 2; // Lower threshold to show more activity
+              const gatedLevel = volumeLevel > threshold ? volumeLevel : Math.max(5, volumeLevel * 0.5);
+              
+              // Log periodically for debugging (every 60 frames = ~1 second)
+              if (frameCount % 60 === 0) {
+                console.log('Waveform update:', { rms, volumeLevel, gatedLevel });
+              }
+              
+              // Create dynamic bars with speech-responsive animation
+              // Ensure minimum visible height even with no audio
+              const baseHeight = Math.max(20, Math.min(95, gatedLevel + 10));
+              
+              // Add organic variation that's proportional to volume
+              const variation = () => (Math.random() - 0.5) * Math.max(5, gatedLevel * 0.2);
+              
+              // Create symmetrical pattern with more dynamic range
+              const multipliers = [0.5, 0.75, 1.0, 0.75, 0.5];
+              const newBars = multipliers.map(mult => 
+                Math.max(15, Math.min(95, baseHeight * mult + variation()))
+              );
+              
+              setBars(newBars);
+            } catch (error) {
+              console.error('Error updating waveform:', error);
             }
-            const rms = Math.sqrt(sumSquares / bufferLength);
-            
-            // Convert RMS to a percentage (0-100)
-            // Amplify the signal for better visual response
-            const volumeLevel = Math.min(100, rms * 400);
-            
-            // Apply a noise gate - only show activity above threshold
-            const threshold = 5; // Minimum level to show activity
-            const gatedLevel = volumeLevel > threshold ? volumeLevel : volumeLevel * 0.3;
-            
-            // Logging disabled for cleaner console output
-            
-            // Create dynamic bars with speech-responsive animation
-            // Center bar responds most, outer bars follow with slight delay
-            const baseHeight = Math.max(15, Math.min(95, gatedLevel));
-            
-            // Add organic variation that's proportional to volume
-            const variation = () => (Math.random() - 0.5) * (gatedLevel * 0.15);
-            
-            // Create symmetrical pattern with more dynamic range
-            const multipliers = [0.4, 0.7, 1.0, 0.7, 0.4];
-            const newBars = multipliers.map(mult => 
-              Math.max(10, Math.min(98, baseHeight * mult + variation()))
-            );
-            
-            setBars(newBars);
           }
           
-          if (isActive) {
+          // Continue animation loop while component is active
+          if (isRunning) {
             animationFrameRef.current = requestAnimationFrame(updateBars);
           }
         };
         
         updateBars();
+        
+        // Cleanup function to stop the loop
+        return () => {
+          isRunning = false; // Stop the animation loop
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+          }
+          if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+            audioContextRef.current.close();
+          }
+        };
       } catch (error) {
         console.error('AudioWaveform: Error initializing audio analysis:', error);
       }
-      
-      return () => {
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-        }
-        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-          audioContextRef.current.close();
-        }
-      };
     } else {
       setBars([15, 20, 25, 20, 15]); // Reset to lower default bars
       if (animationFrameRef.current) {
