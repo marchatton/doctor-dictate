@@ -6,10 +6,10 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const medicalDictionary = require('./data/medical-dictionary.js');
-const { DictationCommandProcessor } = require('./dictation-commands.js');
-const { AudioProcessor } = require('./audio-processor.js');
-const { TranscriptionProgress } = require('./transcription-progress.js');
+const medicalDictionary = require('../../data/medical-dictionary.js');
+const { DictationCommandProcessor } = require('../../data/dictation-commands.js');
+const { AudioProcessor } = require('../audio/processor.js');
+const { TranscriptionProgress } = require('./progress-tracker.js');
 
 class WhisperTranscriber {
     constructor() {

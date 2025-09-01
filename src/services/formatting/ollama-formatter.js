@@ -5,7 +5,7 @@
  * Version 2.0 - Using structured prompt management
  */
 
-const { MedicalPromptV5 } = require('./prompts/medical-prompt-v5');
+const { MedicalPrompt } = require('../../prompts');
 const { ContentVerifier } = require('./content-verifier');
 const fs = require('fs');
 
@@ -200,9 +200,9 @@ class OllamaFormatter {
         }
         
         // Use the new prompt management system
-        const prompt = MedicalPromptV5.build(messyText, transcriptionDate);
+        const prompt = MedicalPrompt.build(messyText, transcriptionDate);
         
-        console.log(`🔍 Using prompt version: ${MedicalPromptV5.VERSION}`);
+        console.log(`🔍 Using prompt version: ${MedicalPrompt.VERSION}`);
         console.log(`🔍 Model: ${this.model}, Temperature: ${this.temperature}`);
         
         try {
@@ -259,7 +259,7 @@ class OllamaFormatter {
                         original: messyText,
                         formatted: enhanced,
                         model: this.model,
-                        promptVersion: MedicalPromptV5.VERSION,
+                        promptVersion: MedicalPrompt.VERSION,
                         success: true,
                         retries: retryCount,
                         llmNotes: notes || null,
@@ -278,7 +278,7 @@ class OllamaFormatter {
                 original: messyText,
                 formatted: cleanedText,
                 model: this.model,
-                promptVersion: MedicalPromptV5.VERSION,
+                promptVersion: MedicalPrompt.VERSION,
                 success: true,
                 retries: retryCount,
                 llmNotes: notes || null,
@@ -375,7 +375,7 @@ class OllamaFormatter {
         });
         
         // Apply medical corrections
-        Object.entries(MedicalPromptV5.MEDICAL_CORRECTIONS).forEach(([key, value]) => {
+        Object.entries(MedicalPrompt.MEDICAL_CORRECTIONS).forEach(([key, value]) => {
             const regex = new RegExp(`\\b${key}\\b`, 'gi');
             formatted = formatted.replace(regex, value);
         });
@@ -394,8 +394,8 @@ class OllamaFormatter {
      * DEPRECATED - Use MedicalPromptV2.build() instead
      */
     createFormattingPrompt(messyText, options = {}) {
-        console.warn('⚠️ createFormattingPrompt is deprecated. Use MedicalPromptV5.build() instead');
-        return MedicalPromptV5.build(messyText);
+        console.warn('⚠️ createFormattingPrompt is deprecated. Use MedicalPrompt.build() instead');
+        return MedicalPrompt.build(messyText);
         // Ultra-strict prompt to prevent hallucination
         let prompt = `You are a medical transcription formatter. Your job is ONLY to reorganize existing content into a template format.
 
@@ -581,7 +581,7 @@ REORGANIZED VERSION:`;
         }
         
         // Apply V3 post-processing for formatting consistency
-        cleaned = MedicalPromptV5.postProcess(cleaned);
+        cleaned = MedicalPrompt.postProcess(cleaned);
         
         // Call the original postProcessMedicalText for other cleaning
         cleaned = this.postProcessMedicalText(cleaned);

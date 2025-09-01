@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
-const { WhisperTranscriber } = require('./whisper.js');
+const { WhisperTranscriber } = require('./services/transcription/whisper.js');
 
 // Keep a global reference of the window object
 let mainWindow;

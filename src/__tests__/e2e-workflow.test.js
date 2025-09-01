@@ -2,7 +2,7 @@
  * End-to-end workflow tests for the complete medical dictation pipeline
  */
 
-const { ProcessorFactory } = require('../unified-processor');
+const { ProcessorFactory } = require('../services/processing/unified-processor');
 const fs = require('fs');
 const path = require('path');
 

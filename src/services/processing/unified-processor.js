@@ -4,9 +4,9 @@
  */
 
 const { ProcessingModes } = require('./processing-config');
-const { WhisperCpp } = require('./whisper-cpp');
-const { OllamaFormatter } = require('./ollama-formatter');
-const { WhisperTranscriber } = require('./whisper');
+const { WhisperCpp } = require('../transcription/whisper-cpp');
+const { OllamaFormatter } = require('../formatting/ollama-formatter');
+const { WhisperTranscriber } = require('../transcription/whisper');
 const fs = require('fs');
 const path = require('path');
 

@@ -2,11 +2,11 @@
  * Test suite for dual-mode processing system
  */
 
-const { ProcessingModes } = require('../processing-config');
-const { UnifiedProcessor, ProcessorFactory } = require('../unified-processor');
-const { WhisperCpp } = require('../whisper-cpp');
-const { OllamaFormatter } = require('../ollama-formatter');
-const { ContentVerifier } = require('../content-verifier');
+const { ProcessingModes } = require('../services/processing/processing-config');
+const { UnifiedProcessor, ProcessorFactory } = require('../services/processing/unified-processor');
+const { WhisperCpp } = require('../services/transcription/whisper-cpp');
+const { OllamaFormatter } = require('../services/formatting/ollama-formatter');
+const { ContentVerifier } = require('../services/formatting/content-verifier');
 const fs = require('fs');
 const path = require('path');
 
