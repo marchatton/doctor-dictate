@@ -91,11 +91,34 @@ class UnifiedProcessor {
   }
   
   async format(text) {
+    console.log('\n' + '='.repeat(60));
+    console.log('🎯 UNIFIED PROCESSOR: Starting format step');
+    console.log('='.repeat(60));
+    
     // Skip formatting for very short texts
     if (text.length < 100) {
       console.log('⚠️ Text too short for formatting, returning as-is');
       return text;
     }
+    
+    console.log(`📄 Input to formatter:`);
+    console.log(`  - Length: ${text.length} characters`);
+    console.log(`  - Preview: "${text.substring(0, 200)}..."`);
+    
+    // Log sections in input
+    const inputLower = text.toLowerCase();
+    console.log('\n📋 Sections in transcript:');
+    if (inputLower.includes('identification')) console.log('  ✓ Identification');
+    if (inputLower.includes('chief complaint') || inputLower.includes('cc')) console.log('  ✓ Chief Complaint/CC');
+    if (inputLower.includes('problem')) console.log('  ✓ Problem List');
+    if (inputLower.includes('current med')) console.log('  ✓ Current Medications');
+    if (inputLower.includes('interim history')) console.log('  ✓ Interim History');
+    
+    console.log(`\n🔧 Formatter configuration:`);
+    console.log(`  - Model: ${this.config.ollama.model}`);
+    console.log(`  - Temperature: ${this.config.ollama.temperature}`);
+    console.log(`  - num_predict: ${this.config.ollama.numPredict}`);
+    console.log(`  - num_ctx: ${this.config.ollama.numCtx}`);
     
     const formatter = new OllamaFormatter({
       model: this.config.ollama.model,
@@ -109,13 +132,31 @@ class UnifiedProcessor {
       return text;
     }
     
+    console.log('\n🚀 Calling formatter.formatMedicalDictation...');
     const result = await formatter.formatMedicalDictation(text, {
       temperature: this.config.ollama.temperature,
-      numPredict: this.config.ollama.numPredict,
-      numCtx: this.config.ollama.numCtx
+      num_predict: this.config.ollama.numPredict,  // Ollama expects snake_case
+      num_ctx: this.config.ollama.numCtx           // Ollama expects snake_case
     });
     
+    console.log('\n📤 Formatter result:');
+    console.log(`  - Success: ${result.success}`);
+    console.log(`  - Formatted length: ${result.formatted?.length || 0} characters`);
+    
     if (result.success) {
+      // Check what sections are in the output
+      const outputLower = result.formatted.toLowerCase();
+      console.log('\n📋 Sections in formatted output:');
+      if (outputLower.includes('identification')) console.log('  ✓ Identification');
+      if (outputLower.includes('cc')) console.log('  ✓ CC');
+      if (outputLower.includes('problem list')) console.log('  ✓ Problem List');
+      if (outputLower.includes('current med')) console.log('  ✓ Current Medications');
+      if (outputLower.includes('interim history')) console.log('  ✓ Interim History');
+      
+      console.log('\n📄 Formatted output preview:');
+      console.log(result.formatted.substring(0, 500));
+      console.log('...');
+      
       return result.formatted;
     } else {
       console.error('❌ Formatting failed:', result.error);

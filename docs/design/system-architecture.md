@@ -80,14 +80,8 @@ sequenceDiagram
     WhisperCpp->>WhisperCpp: Transcribe audio
     WhisperCpp-->>Electron: Raw transcript
     
-    Note over DictationProcessor: Stage 3: Basic Corrections
-    Electron->>DictationProcessor: Process dictation commands
-    DictationProcessor->>DictationProcessor: Apply medical corrections
-    DictationProcessor->>DictationProcessor: Normalize units (mg, ml)
-    DictationProcessor-->>Electron: Corrected text
-    
-    Note over OllamaFormatter: Stage 4: AI Formatting
-    Electron->>OllamaFormatter: Format with template
+    Note over OllamaFormatter: Stage 3: AI Formatting
+    Electron->>OllamaFormatter: Format raw transcript
     OllamaFormatter->>OllamaFormatter: Generate prompt (v7)
     OllamaFormatter->>OllamaServer: POST /api/generate
     OllamaServer->>OllamaServer: Apply LLM formatting
@@ -138,7 +132,6 @@ graph TB
     subgraph "Formatting Services"
         OllamaFormatter[ollama-formatter.js]
         ContentVerifier[content-verifier.js]
-        MedicalFormatter[medical-formatter.js]
     end
 
     subgraph "Processing Services"
@@ -188,9 +181,8 @@ graph TB
 flowchart LR
     A[Audio Recording<br/>WebM/Opus] -->|Convert| B[WAV File<br/>16kHz Mono]
     B -->|Whisper.cpp| C[Raw Transcript<br/>with dictation commands]
-    C -->|DictationProcessor| D[Corrected Text<br/>basic fixes applied]
-    D -->|OllamaFormatter| E[Formatted Note<br/>with sections]
-    E -->|Display| F[Final Transcript]
+    C -->|OllamaFormatter| D[Formatted Note<br/>with sections]
+    D -->|Display| E[Final Transcript]
 ```
 
 ### Prompt Generation Flow
@@ -225,13 +217,13 @@ flowchart TB
 **Request**:
 ```json
 {
-  "model": "mistral:7b-instruct",
+  "model": "llama3.2:latest",
   "prompt": "<<generated prompt from medical-prompt-v7>>",
   "stream": false,
   "options": {
     "temperature": 0.1,
     "num_predict": 4000,
-    "num_ctx": 8192
+    "num_ctx": 32768
   }
 }
 ```
@@ -277,7 +269,7 @@ event.sender.send('transcription-progress', progress)
   },
   ACCURATE: {
     whisperModel: 'small.en',
-    ollamaModel: 'mistral:7b-instruct',
+    ollamaModel: 'llama3.2:latest',
     temperature: 0.1
   }
 }
@@ -310,8 +302,7 @@ stateDiagram-v2
     
     Transcribing --> Error: Whisper Fails
     Formatting --> Error: Ollama Unavailable
-    Error --> Fallback: Return Raw Text
-    Fallback --> Complete: With Warning
+    Error --> Complete: Return Raw Text
     
     Complete --> [*]
 ```

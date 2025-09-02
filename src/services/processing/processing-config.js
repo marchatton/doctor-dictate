@@ -19,11 +19,11 @@ const ProcessingModes = {
     },
     
     ollama: {
-      model: 'qwen2.5:0.5b',  // 397MB model - fastest
+      model: 'llama3.2:latest',  // 3B model for better quality
       temperature: 0.1,
-      numPredict: 256,
-      numCtx: 1024,
-      timeout: 30000
+      numPredict: 10000, // Ensure complete output
+      numCtx: 32768,     // Large context for v7 prompt
+      timeout: 90000     // 90 seconds for processing
     },
     
     vad: {
@@ -53,11 +53,11 @@ const ProcessingModes = {
     },
     
     ollama: {
-      model: 'qwen2.5:1.5b',  // 990MB model - good balance
-      temperature: 0.3,
-      numPredict: 512,
-      numCtx: 2048,
-      timeout: 60000
+      model: 'llama3.2:latest',  // 3B model - mistral is having issues
+      temperature: 0.1,         // Low temperature for consistency
+      numPredict: 12000,        // Large output capacity
+      numCtx: 32768,           // Large context for v7 prompt
+      timeout: 120000          // 2 minutes for complex notes
     },
     
     vad: {

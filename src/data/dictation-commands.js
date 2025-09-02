@@ -4,11 +4,9 @@
  * Enhanced with medical formatting for psychiatric notes
  */
 
-const { MedicalFormatter } = require('../services/formatting/medical-formatter.js');
-
 class DictationCommandProcessor {
     constructor() {
-        this.medicalFormatter = new MedicalFormatter();
+        this.ollamaFormatter = null; // Lazy-loaded to avoid circular dependency
         // Define command mappings
         this.commands = {
             // Paragraph and line breaks
@@ -281,19 +279,26 @@ class DictationCommandProcessor {
         
         // Second pass: Apply comprehensive medical formatting (now async for Ollama)
         console.log('🔍 DICTATION PROCESSOR - Applying medical formatting...');
-        const medicalResult = await this.medicalFormatter.formatMedicalNote(dictationResult.processed);
-        console.log('  Final result method:', medicalResult.method);
+        
+        // Lazy-load OllamaFormatter to avoid circular dependency
+        if (!this.ollamaFormatter) {
+            const { OllamaFormatter } = require('../services/formatting/ollama-formatter.js');
+            this.ollamaFormatter = new OllamaFormatter();
+        }
+        
+        const medicalResult = await this.ollamaFormatter.formatMedicalDictation(dictationResult.processed);
+        console.log('  Final result success:', medicalResult.success);
         console.log('  Final result:', medicalResult.formatted.substring(0, 150) + '...');
         
         const finalOutput = {
             original: text,
-            processed: medicalResult.formatted,
+            processed: medicalResult.formatted || text,
             commands: dictationResult.commands,
             commandCount: dictationResult.commandCount,
-            improvements: medicalResult.improvements,
-            method: medicalResult.method,
-            model: medicalResult.model,
-            formatted: true
+            improvements: [],
+            method: medicalResult.success ? 'ollama' : 'error',
+            model: medicalResult.model || 'unknown',
+            formatted: medicalResult.success || false
         };
         
         console.log('🔍 DICTATION PROCESSOR END - returning processed text of length:', finalOutput.processed.length);

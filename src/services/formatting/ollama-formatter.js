@@ -1,23 +1,16 @@
 /**
  * Ollama LLM Integration for Medical Text Formatting
- * Uses local LLM to clean up medical dictation transcripts
- * Provides ChatGPT-level formatting while keeping data private
- * Version 2.0 - Using structured prompt management
+ * Simplified version - trusts LLM and v7 prompt to handle medical formatting properly
  */
 
 const { MedicalPrompt } = require('../../prompts');
-const { ContentVerifier } = require('./content-verifier');
-const fs = require('fs');
 
 class OllamaFormatter {
     constructor(config = {}) {
         this.baseUrl = 'http://localhost:11434';
-        // Allow model override from config, otherwise auto-select
         this.model = config.model || this.selectOptimalModel();
         this.isAvailable = null; // Cache availability status
-        this.temperature = config.temperature || 0.1; // Slight variation, not zero (prevents repetition)
-        this.maxRetries = 2; // Number of retries for hallucination issues
-        this.contentVerifier = new ContentVerifier(); // Content verification system
+        this.temperature = config.temperature || 0.1;
         
         // Store config for dynamic adjustment
         this.config = config;
@@ -27,16 +20,17 @@ class OllamaFormatter {
      * Select optimal model based on what's available
      */
     selectOptimalModel() {
-        // Prefer models in this order for medical accuracy
         const preferredModels = [
-            'mistral:7b-instruct',     // Best for medical accuracy
-            'mistral:7b',               // Good alternative
-            'llama3.2:3b-instruct',     // Smaller but still good
-            'llama3.2',                 // Default fallback
-            'llama2'                    // Last resort
+            'llama3.2:latest',
+            'llama3.2:3b',
+            'qwen2.5:3b',
+            'qwen2.5:1.5b',
+            'mistral:latest',
+            'mistral:7b-instruct',
+            'mistral:7b',
+            'qwen2.5:0.5b'
         ];
         
-        // Will be validated when checking availability
         return preferredModels[0];
     }
 
@@ -49,7 +43,6 @@ class OllamaFormatter {
         }
 
         try {
-            // Add timeout for availability check (5 seconds)
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
             
@@ -63,7 +56,6 @@ class OllamaFormatter {
             
             this.isAvailable = response.ok;
             
-            // If available, try to select best model
             if (this.isAvailable) {
                 await this.selectBestAvailableModel();
             }
@@ -100,25 +92,31 @@ class OllamaFormatter {
         const modelNames = availableModels.map(m => m.name);
         
         const preferredModels = [
+            'llama3.2:latest',
+            'llama3.2:3b',
+            'qwen2.5:3b',
+            'qwen2.5:1.5b',
+            'mistral:latest',
             'mistral:7b-instruct',
             'mistral:7b',
-            'llama3.2:3b-instruct',
-            'llama3.2',
-            'llama2'
+            'qwen2.5:0.5b'
         ];
         
         for (const preferred of preferredModels) {
             if (modelNames.includes(preferred)) {
                 this.model = preferred;
-                console.log(`Selected optimal model: ${preferred}`);
+                console.log(`✅ Selected optimal model: ${preferred}`);
+                
+                if (preferred.includes('0.5b')) {
+                    console.warn('⚠️ Using small model (0.5B) - may have issues with complex prompts');
+                }
                 return;
             }
         }
         
-        // Use first available model if none preferred found
         if (modelNames.length > 0) {
             this.model = modelNames[0];
-            console.log(`Using available model: ${this.model}`);
+            console.log(`🔄 Using available model: ${this.model}`);
         }
     }
 
@@ -131,7 +129,7 @@ class OllamaFormatter {
     }
 
     /**
-     * Generate completion using Ollama with smart retry logic
+     * Generate completion using Ollama
      */
     async generateCompletion(prompt, options = {}) {
         const requestBody = {
@@ -141,16 +139,22 @@ class OllamaFormatter {
             options: {
                 temperature: this.temperature,
                 top_p: 0.9,
-                repeat_penalty: 1.0, // Don't penalize medical term repetition
-                max_tokens: 4000,
+                repeat_penalty: 1.0,
+                num_predict: 12000,
+                num_ctx: 32768,
+                stop: [],
                 ...options
             }
         };
+        
+        console.log('\n🌐 OLLAMA REQUEST CONFIG:');
+        console.log('  Model:', this.model);
+        console.log('  Temperature:', requestBody.options.temperature);
 
         try {
-            // Add timeout for Ollama requests (60 seconds for complex prompts)
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000);
+            const timeoutMs = options.timeout || 120000;
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
             
             const response = await fetch(`${this.baseUrl}/api/generate`, {
                 method: 'POST',
@@ -166,506 +170,184 @@ class OllamaFormatter {
             }
 
             const data = await response.json();
+            
+            console.log('\n📥 OLLAMA API RESPONSE:');
+            console.log('  - Response length:', data.response?.length || 0, 'characters');
+            console.log('  - Tokens generated:', data.eval_count || 'unknown');
+            console.log('  - Duration:', data.total_duration ? (data.total_duration / 1000000000).toFixed(2) + 's' : 'unknown');
+            
+            if (data.done_reason === 'length') {
+                console.warn('⚠️ Response was truncated due to token limit');
+            }
+            
+            if (!data.response) {
+                console.error('❌ No response field in Ollama response!');
+                throw new Error('Empty response from Ollama');
+            }
+            
             return data.response?.trim() || '';
         } catch (error) {
+            if (error.name === 'AbortError') {
+                throw new Error('Request timed out');
+            }
             console.error('Ollama generation error:', error);
             throw error;
         }
     }
 
     /**
-     * Format medical dictation using new prompt system with retry logic
+     * Format medical dictation using Ollama with simple error handling
      */
     async formatMedicalDictation(messyText, options = {}) {
-        const { transcriptionDate } = options;
-        const available = await this.isOllamaAvailable();
-        if (!available) {
-            throw new Error('Ollama is not available. Please ensure Ollama is running and models are installed.');
-        }
+        try {
+            const available = await this.isOllamaAvailable();
+            if (!available) {
+                return {
+                    success: false,
+                    formatted: messyText,
+                    error: 'Ollama service is not available',
+                    model: 'none'
+                };
+            }
 
-        // Use new prompt system with retry logic
-        return await this.formatWithRetry(messyText, options);
+            return await this.formatWithSimpleHandling(messyText, options);
+        } catch (error) {
+            console.error('Ollama formatting error:', error.message);
+            return {
+                success: false,
+                formatted: messyText,
+                error: error.message,
+                model: this.model || 'unknown'
+            };
+        }
     }
-    
+
     /**
-     * Format with retry logic for handling hallucinations
+     * Format with simplified error handling
      */
-    async formatWithRetry(messyText, options = {}, retryCount = 0) {
-        const { transcriptionDate } = options;
+    async formatWithSimpleHandling(messyText, options = {}) {
+        console.log('\n📊 OLLAMA FORMATTING - INPUT ANALYSIS:');
+        console.log('  Input length:', messyText.length, 'characters');
         
-        // Skip Ollama for non-medical test inputs
-        if (messyText.length < 100 && !messyText.toLowerCase().match(/patient|diagnosis|medication|history|assessment/)) {
-            console.log('🔍 Skipping Ollama for non-medical short input');
-            return this.fallbackFormat(messyText);
+        // Trust the user's input - process everything that comes in
+        if (messyText.length < 10) {
+            console.log('⚠️ Input too short - returning as-is');
+            return {
+                success: true,
+                formatted: messyText,
+                model: this.model,
+                promptVersion: 'none'
+            };
         }
         
-        // Use the new prompt management system
-        const prompt = MedicalPrompt.build(messyText, transcriptionDate);
+        // Initialize prompt generator
+        const { promptGenerator } = await this.initializePrompt();
+        if (!promptGenerator) {
+            console.error('❌ Failed to initialize prompt generator');
+            return {
+                success: false,
+                formatted: messyText,
+                error: 'Failed to initialize prompt generator',
+                model: this.model
+            };
+        }
         
-        console.log(`🔍 Using prompt version: ${MedicalPrompt.VERSION}`);
+        const prompt = promptGenerator.generatePrompt(messyText);
+        
+        console.log(`🔍 Using v7 prompt system`);
         console.log(`🔍 Model: ${this.model}, Temperature: ${this.temperature}`);
+        console.log('📝 PROMPT LENGTH:', prompt.length, 'characters');
         
         try {
             const formattedText = await this.generateCompletion(prompt, {
                 temperature: this.temperature,
-                max_tokens: 4000
+                num_predict: 4000
             });
             
-            console.log(`🔍 Ollama returned ${formattedText.length} chars (input was ${messyText.length} chars)`);
-            if (formattedText.length > 500) {
-                console.log(`🔍 Ollama output preview: ${formattedText.substring(0, 200)}...`);
-            } else {
-                console.log(`🔍 Ollama output: ${formattedText}`);
+            console.log(`\n🎯 OLLAMA RESPONSE:`);
+            console.log(`  - Response length: ${formattedText.length} chars`);
+            
+            if (!formattedText || formattedText.length < 10) {
+                console.error('❌ Empty or too short response from Ollama');
+                return {
+                    success: false,
+                    formatted: messyText,
+                    error: 'Empty response from Ollama',
+                    model: this.model
+                };
             }
             
-            // Validate output for hallucinations
-            if (this.isLikelyHallucination(messyText, formattedText)) {
-                if (retryCount < this.maxRetries) {
-                    console.warn(`⚠️ Possible hallucination detected, retrying (${retryCount + 1}/${this.maxRetries})`);
-                    // Lower temperature on retry for more deterministic output
-                    const originalTemp = this.temperature;
-                    this.temperature = Math.max(0.0, this.temperature - 0.05);
-                    const result = await this.formatWithRetry(messyText, options, retryCount + 1);
-                    this.temperature = originalTemp;
-                    return result;
-                } else {
-                    console.error('❌ Multiple hallucination attempts, using fallback');
-                    return this.fallbackFormat(messyText);
-                }
-            }
-            
-            // Post-process to ensure quality and extract notes
-            const { text: cleanedText, notes } = this.postProcessAndExtractNotes(formattedText);
-            
-            // Verify content completeness
-            const verification = this.contentVerifier.verifyContent(messyText, cleanedText);
-            
-            if (!verification.isValid) {
-                console.warn(`⚠️ Content verification failed: ${verification.coveragePercent} coverage`);
-                console.log(this.contentVerifier.generateReport(verification, cleanedText));
-                
-                // Attempt to reinject missing content
-                const enhanced = this.contentVerifier.reinjectMissingContent(
-                    cleanedText, 
-                    verification.missingSentences, 
-                    messyText
-                );
-                
-                // Re-verify after reinjection
-                const reverification = this.contentVerifier.verifyContent(messyText, enhanced);
-                if (reverification.isValid) {
-                    console.log('✅ Content successfully recovered after reinjection');
-                    return {
-                        original: messyText,
-                        formatted: enhanced,
-                        model: this.model,
-                        promptVersion: MedicalPrompt.VERSION,
-                        success: true,
-                        retries: retryCount,
-                        llmNotes: notes || null,
-                        contentRecovered: true,
-                        verification: reverification
-                    };
-                }
-            }
-            
-            // Log any LLM notes separately for debugging
-            if (notes) {
-                console.log(`📝 LLM Notes: ${notes}`);
-            }
+            // Simple post-processing
+            const cleanedText = this.postProcessResponse(formattedText);
             
             return {
-                original: messyText,
+                success: true,
                 formatted: cleanedText,
                 model: this.model,
-                promptVersion: MedicalPrompt.VERSION,
-                success: true,
-                retries: retryCount,
-                llmNotes: notes || null,
-                verification: verification
+                promptVersion: 'v7'
             };
         } catch (error) {
             console.error('❌ Formatting failed:', error.message);
             
-            if (retryCount < this.maxRetries) {
-                return await this.formatWithRetry(messyText, options, retryCount + 1);
+            if (error.name === 'AbortError') {
+                return {
+                    success: false,
+                    formatted: messyText,
+                    error: 'Request timed out - try a smaller model',
+                    model: this.model
+                };
             }
             
-            return this.fallbackFormat(messyText);
+            return {
+                success: false,
+                formatted: messyText,
+                error: error.message,
+                model: this.model
+            };
         }
     }
     
     /**
-     * Check if output is likely a hallucination
+     * Initialize prompt system if not already initialized
      */
-    isLikelyHallucination(original, processed) {
-        // For very short inputs, formatting may add headers which is expected
-        if (original.length < 50) {
-            // Only check if output is WAY too long (>3x)
-            if (processed.length > original.length * 3) {
-                console.warn('Short input produced 3x longer output');
-                return true;
-            }
-            return false; // Short inputs often need formatting additions
+    async initializePrompt() {
+        if (!this.promptGenerator) {
+            console.log('🔧 Initializing v7 prompt generator...');
+            const { MedicalPrompt, TemplateLoader } = require('../../prompts');
+            
+            const template = TemplateLoader.load('medicine-management');
+            console.log('  ✓ Template loaded:', template.name || 'medicine-management');
+            
+            this.promptGenerator = new MedicalPrompt(template);
+            console.log('  ✓ V7 prompt generator initialized');
         }
-        
-        // For longer inputs, check if output is significantly longer (>60% increase)
-        // Note: Adding headers and formatting can legitimately increase length
-        if (processed.length > original.length * 1.6) {
-            console.warn('Output is 60% longer than input');
-            return true;
-        }
-        
-        // Check if key medical terms from input are preserved
-        const originalWords = new Set(original.toLowerCase().split(/\s+/));
-        const processedWords = new Set(processed.toLowerCase().split(/\s+/));
-        
-        // Medical terms that should be preserved (if present in original)
-        const importantTerms = new Set(['adhd', 'depression', 'anxiety', 'mg', 'lexapro', 
-                                       'sertraline', 'patient', 'stable', 'improving', 
-                                       'medications', 'diagnosis', 'assessment']);
-        
-        const originalMedical = new Set([...originalWords].filter(w => importantTerms.has(w)));
-        const processedMedical = new Set([...processedWords].filter(w => importantTerms.has(w)));
-        
-        // If we lost more than 70% of medical terms, likely an issue
-        // (Allow some loss due to corrections like ACHD->ADHD)
-        if (originalMedical.size > 2 && processedMedical.size < originalMedical.size * 0.3) {
-            console.warn(`Lost ${originalMedical.size - processedMedical.size} of ${originalMedical.size} medical terms`);
-            return true;
-        }
-        
-        // Check if the output contains completely new content not in original
-        // This is a sign of hallucination
-        const suspiciousAdditions = [
-            'john doe', 'jane doe', 'example', 'sample', 'test patient',
-            'lorem ipsum', 'placeholder', '[your text here]'
-        ];
-        
-        const processedLower = processed.toLowerCase();
-        for (const suspicious of suspiciousAdditions) {
-            if (processedLower.includes(suspicious) && !original.toLowerCase().includes(suspicious)) {
-                console.warn(`Detected suspicious addition: "${suspicious}"`);
-                return true;
-            }
-        }
-        
-        return false;
+        return { promptGenerator: this.promptGenerator };
     }
     
     /**
-     * Fallback formatting when LLM fails
+     * Post-process the response from Ollama
      */
-    fallbackFormat(messyText) {
-        // Simple rule-based fallback
-        let formatted = messyText;
+    postProcessResponse(response) {
+        console.log('🔧 POST-PROCESSING: Starting...');
+        let processed = response;
         
-        // Apply basic punctuation corrections
-        // V5 handles punctuation in postProcess, but for fallback we need basic rules
-        const basicPunctuation = {
-            'period': '.',
-            'comma': ',',
-            'colon': ':',
-            'next paragraph': '\n\n',
-            'next line': '\n'
-        };
-        Object.entries(basicPunctuation).forEach(([key, value]) => {
-            const regex = new RegExp(`\\b${key}\\b`, 'gi');
-            formatted = formatted.replace(regex, value);
-        });
+        // Remove wrapper text
+        processed = processed.replace(/^(Here is|Here's|The formatted|Formatted)[^#]*?(?=###|\n\n)/i, '').trim();
         
-        // Apply medical corrections
-        Object.entries(MedicalPrompt.MEDICAL_CORRECTIONS).forEach(([key, value]) => {
-            const regex = new RegExp(`\\b${key}\\b`, 'gi');
-            formatted = formatted.replace(regex, value);
-        });
-        
-        return {
-            original: messyText,
-            formatted: formatted,
-            model: 'fallback',
-            promptVersion: 'fallback',
-            success: false,
-            error: 'LLM unavailable or producing hallucinations'
-        };
-    }
-
-    /**
-     * DEPRECATED - Use MedicalPromptV2.build() instead
-     */
-    createFormattingPrompt(messyText, options = {}) {
-        console.warn('⚠️ createFormattingPrompt is deprecated. Use MedicalPrompt.build() instead');
-        return MedicalPrompt.build(messyText);
-        // Ultra-strict prompt to prevent hallucination
-        let prompt = `You are a medical transcription formatter. Your job is ONLY to reorganize existing content into a template format.
-
-CRITICAL RULES:
-- NEVER add information not in the original transcript
-- NEVER copy from examples or templates  
-- NEVER guess or fabricate any medical information
-- ONLY reorganize the exact words and information provided
-- If information is missing from a section, leave that section out entirely
-- Use [brackets] only for unclear medication names from the transcript
-
-TEMPLATE FORMAT (only include sections with actual content from transcript):
-
-# Identification
-[patient info from transcript]
-
-**CC:** [chief complaint from transcript]
-
-## Problem List
-1. [condition]: [status from transcript]
-
-## Current Medications
-1. [medication name] [dose] ([frequency])
-
-## Interim History
-[history content from transcript]
-
-## Past Medical History
-[past medical history from transcript]
-
-## Social History
-[social history from transcript]
-
-## Family History
-[family history from transcript]
-
-## ROS
-[review of systems from transcript]
-
-## MSE
-[mental status exam from transcript]
-
-## Risk Assessment
-[risk assessment from transcript]
-
-## Assessment
-[assessment from transcript]
-
-## Plan
-[plan from transcript]
-
-## Therapy Notes
-[therapy notes from transcript]
-
-TRANSCRIPT TO REORGANIZE (use ONLY this content, do not add missing sections):
-"${messyText}"
-
-REORGANIZED VERSION:`;
-
-        return prompt;
-    }
-
-    /**
-     * Step 1: Extract sections using regex patterns
-     */
-    extractSections(text) {
-        const sections = {};
-        
-        // Convert to lowercase for matching but preserve original case
-        const lowerText = text.toLowerCase();
-        
-        // Define section patterns (order matters - more specific first)
-        const patterns = [
-            { key: 'identification', regex: /identification:?\s*([^,]*(?:john\s+\w+|smith|patient)[^;,]*)/i },
-            { key: 'chief_complaint', regex: /(?:chief complaint|cc)\s*:?\s*([^;,]*(?:follow|visit|appointment)[^;,]*)/i },
-            { key: 'problem_list', regex: /(?:problem\s*list|problemist)[^:]*:?\s*([^;]*(?:adhd|depression|anxiety|bipolar)[^;]*)/i },
-            { key: 'medications', regex: /(?:current\s*)?medications?[^:]*:?\s*([^;]*(?:mg|lexapro|prozac|zoloft|apm)[^;]*)/i },
-            { key: 'history', regex: /(?:interim\s*)?history:?\s*([^;]*)/i }
-        ];
-        
-        // Extract each section
-        patterns.forEach(pattern => {
-            const match = text.match(pattern.regex);
-            if (match && match[1]) {
-                sections[pattern.key] = match[1].trim();
+        // If still starts with non-header text, find first ###
+        if (!processed.startsWith('###') && processed.includes('###')) {
+            const firstHeaderIndex = processed.indexOf('###');
+            const beforeHeader = processed.substring(0, firstHeaderIndex);
+            if (beforeHeader.length < 100 && !beforeHeader.match(/\d+\.|diagnosis|patient|medication/i)) {
+                processed = processed.substring(firstHeaderIndex);
             }
-        });
-        
-        // If no sections found, put everything in a general section
-        if (Object.keys(sections).length === 0) {
-            sections.general = text;
         }
         
-        return sections;
-    }
-
-    /**
-     * Step 2: Clean individual section with focused LLM prompt  
-     */
-    async cleanSection(text, sectionType) {
-        const sectionPrompts = {
-            identification: 'Fix punctuation and capitalization. Return just the clean patient info:',
-            chief_complaint: 'Extract the chief complaint. Return just "follow-up" or similar:',
-            problem_list: 'Format as numbered list. Example: "1. ADHD: improving, partial control\\n2. Major Depressive Disorder: stable":',
-            medications: 'Format as numbered list with medication names. Example: "1. Lexapro 20mg (one pill per day)\\n2. [Medication] 60mg (QHS)":',
-            history: 'Clean up punctuation and capitalization only:',
-            general: 'Fix punctuation and capitalization only:'
-        };
+        // Remove code blocks
+        processed = processed.replace(/^```[\w]*\n/, '').replace(/\n```$/, '').trim();
         
-        const prompt = (sectionPrompts[sectionType] || sectionPrompts.general) + `\n\n"${text}"\n\nCleaned version:`;
-        
-        try {
-            const cleaned = await this.generateCompletion(prompt, {
-                temperature: 0.1,
-                max_tokens: 500
-            });
-            return cleaned.trim();
-        } catch (error) {
-            return text; // Return original if cleaning fails
-        }
-    }
-
-    /**
-     * Step 3: Assemble note with consistent structure
-     */
-    assembleNote(sections) {
-        let note = '';
-        
-        // Build note in standard order - match expected template format
-        if (sections.identification) {
-            note += `Identification: ${sections.identification}\n\n`;
-        }
-        
-        if (sections.chief_complaint) {
-            note += `CC ${sections.chief_complaint}.\n\n`;
-        }
-        
-        if (sections.problem_list) {
-            note += `Problem list:\n${sections.problem_list}\n\n`;
-        }
-        
-        if (sections.medications) {
-            note += `Current medications:\n${sections.medications}\n\n`;
-        }
-        
-        if (sections.history) {
-            note += `Interim History:\n${sections.history}\n\n`;
-        }
-        
-        // Add any other sections
-        Object.entries(sections).forEach(([key, content]) => {
-            if (!['identification', 'chief_complaint', 'problem_list', 'medications', 'history'].includes(key)) {
-                const title = key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ');
-                note += `${title}:\n${content}\n\n`;
-            }
-        });
-        
-        return note.trim();
-    }
-
-    /**
-     * Post-process medical text and extract any notes/explanations
-     */
-    postProcessAndExtractNotes(text) {
-        let cleaned = text;
-        let notes = null;
-        
-        // Extract any "Note:" or explanatory text from the LLM
-        const notePattern = /\n*(?:Note|Notes|Explanation|Commentary|Comment):\s*(.+?)(?:\n\n|$)/is;
-        const noteMatch = cleaned.match(notePattern);
-        if (noteMatch) {
-            notes = noteMatch[1].trim();
-            // Remove the note from the main text
-            cleaned = cleaned.replace(noteMatch[0], '').trim();
-        }
-        
-        // Also extract any text that starts with "I removed" or "I changed" etc
-        const explanationPattern = /\n*(?:I\s+(?:removed|changed|converted|fixed|corrected|formatted).+?)(?:\n\n|$)/i;
-        const explMatch = cleaned.match(explanationPattern);
-        if (explMatch) {
-            notes = (notes ? notes + ' ' : '') + explMatch[0].trim();
-            cleaned = cleaned.replace(explMatch[0], '').trim();
-        }
-        
-        // Apply V3 post-processing for formatting consistency
-        cleaned = MedicalPrompt.postProcess(cleaned);
-        
-        // Call the original postProcessMedicalText for other cleaning
-        cleaned = this.postProcessMedicalText(cleaned);
-        
-        return { text: cleaned, notes };
-    }
-    
-    /**
-     * Post-process medical text to fix common formatting issues
-     */
-    postProcessMedicalText(text) {
-        let cleaned = text;
-        
-        // Issue 1: Remove LLM prefix phrases
-        cleaned = cleaned.replace(/^(Here is the cleaned transcript[:\s]*["']?|Cleaned version[:\s]*["']?)/i, '').trim();
-        cleaned = cleaned.replace(/["']$/, '').trim(); // Remove trailing quote
-        
-        // Issue 2: Ensure proper markdown structure (if not already present)
-        if (!cleaned.includes('# Identification') && cleaned.includes('identification')) {
-            // Simple structure enforcement for common patterns
-            cleaned = cleaned.replace(/identification[:\s,]*/i, '# Identification\n');
-            cleaned = cleaned.replace(/chief complaint[:\s]*/i, '\n**CC:** ');
-            cleaned = cleaned.replace(/problem(?:\s*list)?[:\s]*/i, '\n## Problem List\n');
-            cleaned = cleaned.replace(/(?:current\s*)?medications?[:\s]*/i, '\n## Current Medications\n');
-        }
-        
-        // Issue 3: Fix medical abbreviations (capitalize standard ones)
-        const medicalAbbrevs = {
-            'qhs': 'QHS',
-            'bid': 'BID', 
-            'tid': 'TID',
-            'qid': 'QID',
-            'prn': 'PRN',
-            'mg': 'mg', // keep lowercase
-            'adhd': 'ADHD',
-            'ptsd': 'PTSD',
-            'ocd': 'OCD'
-        };
-        
-        Object.entries(medicalAbbrevs).forEach(([lower, upper]) => {
-            // Match whole words only, preserve context
-            const regex = new RegExp(`\\b${lower}\\b`, 'gi');
-            cleaned = cleaned.replace(regex, upper);
-        });
-        
-        // Issue 4: Fix common content preservation issues
-        cleaned = cleaned.replace(/history of and /gi, 'history of ADHD and ');
-        cleaned = cleaned.replace(/seventh grade/gi, 'seventh grade');
-        
-        // Issue 5: Standardize medication name brackets
-        cleaned = cleaned.replace(/\[\s*([^[\]]*)\s*\]/g, '[$1]'); // Remove extra spaces
-        cleaned = cleaned.replace(/([A-Za-z]+)\s*PM/g, '[$1 PM]'); // Bracket unclear PM medications
-        
-        // Clean up extra whitespace and ensure proper line breaks
-        cleaned = cleaned.replace(/\n{3,}/g, '\n\n'); // Max 2 consecutive newlines
-        cleaned = cleaned.replace(/\s+$/gm, ''); // Remove trailing spaces
-        
-        return cleaned.trim();
-    }
-
-    /**
-     * Quick format for short text snippets
-     */
-    async quickFormat(text, focusArea = 'general') {
-        const available = await this.isOllamaAvailable();
-        if (!available) {
-            return text; // Fallback to original
-        }
-
-        const prompt = `Fix this medical text (punctuation, capitalization, structure):
-"${text}"
-
-Return only the corrected text:`;
-
-        try {
-            const result = await this.generateCompletion(prompt, {
-                temperature: 0.1,
-                max_tokens: 500
-            });
-            return result || text;
-        } catch (error) {
-            console.error('Quick format error:', error);
-            return text; // Fallback
-        }
+        console.log(`  - Cleaned text: ${response.length} -> ${processed.length} chars`);
+        return processed;
     }
 
     /**
@@ -689,9 +371,8 @@ Return only the corrected text:`;
                 };
             }
 
-            // Test with simple prompt
             const testResult = await this.generateCompletion('Say "Hello, medical formatting is ready!"', {
-                max_tokens: 50
+                num_predict: 50
             });
 
             return {
