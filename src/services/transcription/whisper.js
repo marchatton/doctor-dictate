@@ -33,16 +33,29 @@ class WhisperTranscriber {
      */
     async initializeWhisper() {
         try {
-            // Check if whisper-testing venv exists from Phase 0
-            const testingVenvPath = path.join(__dirname, '..', 'whisper-testing', 'venv');
-            if (fs.existsSync(testingVenvPath)) {
-                this.whisperEnvPath = testingVenvPath;
-                console.log('Using existing Whisper environment from testing');
+            // Check if whisper-cpp is available
+            const { execSync } = require('child_process');
+            try {
+                execSync('which whisper-cpp', { stdio: 'ignore' });
+                this.whisperEnvPath = 'whisper-cpp'; // Just a flag that it's available
+                console.log('whisper-cpp binary found');
+                return true;
+            } catch {
+                console.warn('whisper-cpp not found, will try fallback methods');
+            }
+
+            // Check if models exist
+            const modelsPath = path.join(require('os').homedir(), '.whisper-cpp', 'models');
+            if (fs.existsSync(modelsPath)) {
+                this.whisperEnvPath = 'whisper-models'; // Flag that models exist
+                console.log('Whisper models found at:', modelsPath);
                 return true;
             }
 
-            // TODO: Create new venv and install Whisper if testing env not available
-            throw new Error('Whisper environment not found. Please run Phase 0 testing first.');
+            // We can still work without the environment by using WhisperCpp directly
+            this.whisperEnvPath = 'direct'; // Flag to use direct mode
+            console.log('Will use WhisperCpp service directly');
+            return true;
             
         } catch (error) {
             console.error('Failed to initialize Whisper:', error);
@@ -252,13 +265,45 @@ class WhisperTranscriber {
      * @private
      */
     async runWhisper(audioFilePath, progressCallback) {
-        return new Promise((resolve, reject) => {
-            // Validate that Whisper environment is initialized
-            if (!this.whisperEnvPath) {
-                reject(new Error('Whisper environment not initialized. Please run initializeWhisper() first or ensure whisper-testing/venv exists.'));
-                return;
+        // Use WhisperCpp service instead of Python
+        const { WhisperCpp } = require('./whisper-cpp');
+        
+        try {
+            // Set the model based on selectedModel
+            const modelMap = {
+                'tiny': 'tiny.en',
+                'base': 'base.en',
+                'small': 'small.en',
+                'tiny.en': 'tiny.en',
+                'base.en': 'base.en',
+                'small.en': 'small.en'
+            };
+            
+            const model = modelMap[this.selectedModel] || 'tiny.en';
+            console.log(`Using WhisperCpp with model: ${model}`);
+            
+            // Create WhisperCpp with the correct model
+            const whisperCpp = new WhisperCpp({ model: model });
+            
+            // Transcribe using WhisperCpp (second param is options, not model)
+            const result = await whisperCpp.transcribe(audioFilePath, {});
+            
+            // WhisperCpp.transcribe returns the transcript string directly
+            if (result && typeof result === 'string') {
+                return result;
+            } else if (result && result.text) {
+                // In case it returns an object with text property
+                return result.text;
+            } else {
+                throw new Error('No transcription text returned from WhisperCpp');
             }
-
+        } catch (error) {
+            console.error('WhisperCpp transcription failed:', error);
+            throw error;
+        }
+        
+        /* Old Python-based implementation - keeping for reference
+        return new Promise((resolve, reject) => {
             const pythonExecutable = process.platform === 'win32' 
                 ? path.join(this.whisperEnvPath, 'Scripts', 'python.exe')
                 : path.join(this.whisperEnvPath, 'bin', 'python');
@@ -329,6 +374,7 @@ class WhisperTranscriber {
                 reject(new Error(`Failed to start Whisper: ${error.message}`));
             });
         });
+        */
     }
 
     /**

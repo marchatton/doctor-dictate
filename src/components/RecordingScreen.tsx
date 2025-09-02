@@ -215,20 +215,24 @@ export function RecordingScreen({
               onProcessingProgressRef.current('complete', 100);
               onTranscriptionCompleteRef.current(transcribeResult.transcript);
             } else {
-              // If transcription failed, show mock data for testing
-              console.warn('Transcription failed, using mock data for testing');
-              onProcessingProgressRef.current('transcribe', 100);
-              onProcessingProgressRef.current('medical', 100);
-              onProcessingProgressRef.current('complete', 100);
-              onTranscriptionCompleteRef.current('Patient presents with mild anxiety and reports improved sleep patterns. Continuing current medication regimen with sertraline 50mg daily. Follow-up scheduled in 4 weeks.');
+              // If transcription failed, show error message
+              console.error('Transcription failed:', transcribeResult.error);
+              onProcessingProgressRef.current('error', 0);
+              const errorMessage = `Transcription Error: ${transcribeResult.error || 'Unable to process audio. Please check that Whisper is properly installed and try again.'}`;
+              alert(errorMessage);
+              // Reset the recording state
+              setIsRecording(false);
+              setRecordingTime(0);
             }
           } catch (error) {
             console.error('Error processing audio:', error);
-            // Show mock data for testing
-            onProcessingProgressRef.current('transcribe', 100);
-            onProcessingProgressRef.current('medical', 100);
-            onProcessingProgressRef.current('complete', 100);
-            onTranscriptionCompleteRef.current('Patient presents with mild anxiety and reports improved sleep patterns. Continuing current medication regimen with sertraline 50mg daily. Follow-up scheduled in 4 weeks.');
+            // Show error message to user
+            onProcessingProgressRef.current('error', 0);
+            const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred while processing the audio.';
+            alert(`Processing Error: ${errorMessage}`);
+            // Reset the recording state
+            setIsRecording(false);
+            setRecordingTime(0);
           } finally {
             // Clean up progress listener
             window.electronAPI?.removeTranscriptionProgressListener();

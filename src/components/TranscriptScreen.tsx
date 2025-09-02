@@ -43,13 +43,10 @@ export function TranscriptScreen({
   const [showMedications, setShowMedications] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   
-  // Process transcript with template filtering
+  // Use transcript directly - backend already formats it properly
   const filteredTranscript = useMemo(() => {
-    return filterTemplate(transcript, {
-      removeEmptySections: true,
-      removePlaceholders: true,
-      removeHeaders: false
-    });
+    // Just do basic cleanup - remove excessive whitespace
+    return transcript.replace(/\n{3,}/g, '\n\n').trim();
   }, [transcript]);
   
   // Extract additional metadata from transcript if not provided

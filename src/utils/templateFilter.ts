@@ -105,9 +105,23 @@ function removeEmptyMarkdownSections(text: string): string {
         }
         
         // Check if this line has meaningful content
-        if (contentLine.trim() && !isTemplateLine(contentLine)) {
-          hasContent = true;
-          break;
+        // Be less aggressive - only remove if truly empty or just template placeholder
+        if (contentLine.trim() && contentLine.trim().length > 0) {
+          // If it contains actual content (numbers, colons, medical info, lists), keep it
+          if (contentLine.match(/^\d+\./) || // Numbered list
+              contentLine.match(/^-\s+/) || // Bullet list
+              contentLine.match(/\d/) || // Contains numbers
+              contentLine.includes(':') || // Contains colons (likely labels)
+              contentLine.includes('.') || // Contains periods (sentences)
+              contentLine.length > 20) { // Has substantial content
+            hasContent = true;
+            break;
+          }
+          // Only skip if it's purely a template phrase
+          if (!isTemplateLine(contentLine)) {
+            hasContent = true;
+            break;
+          }
         }
         j++;
       }
@@ -118,8 +132,12 @@ function removeEmptyMarkdownSections(text: string): string {
       // Skip this header if no content found
     } else {
       // Not a header, include if it has content
-      if (line.trim() && !isTemplateLine(line)) {
-        result.push(line);
+      // Be less aggressive here too
+      if (line.trim()) {
+        // Only skip lines that are purely template phrases
+        if (!isTemplateLine(line) || line.includes(':') || line.match(/\d/)) {
+          result.push(line);
+        }
       } else if (line.trim() === '') {
         // Preserve some empty lines for formatting
         result.push(line);

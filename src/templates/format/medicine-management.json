@@ -168,15 +168,36 @@
       "numbered": "{n}. ",
       "bullet": "- "
     },
+    "medicationFormat": "{Name} {Dosage} ({Frequency})",
+    "problemFormat": "{Diagnosis} – {status}",
     "signatureFormat": "*Signed by {Name}, MD on {Date}*",
-    "dateFormat": "MMM/DD/YYYY"
+    "dateFormat": "MMM/DD/YYYY",
+    "listSeparators": {
+      "problem": " – ",
+      "medication": " ",
+      "default": ": "
+    }
   },
-  "globalRules": [
-    "Never omit content from dictation",
-    "Preserve exact dosing language as dictated",
-    "Convert dictation commands to punctuation",
-    "Use Title Case for all diagnoses",
-    "Preserve medication names as dictated (don't swap brand/generic)",
-    "Use abbreviations (mg not milligrams)"
+  "templateSpecificRules": [
+    {
+      "section": "Problem List",
+      "rule": "Use numbered list with diagnosis – status format"
+    },
+    {
+      "section": "Current Meds", 
+      "rule": "Format as: Name Dosage (frequency in patient's words)"
+    },
+    {
+      "section": "Interim History",
+      "rule": "Use bullet points for clinical observations"
+    },
+    {
+      "section": "MSE",
+      "rule": "Include both suicidal and homicidal ideation assessment"
+    },
+    {
+      "section": "Risk Assessment",
+      "rule": "Use 'imminently' not 'immediately' for risk timing"
+    }
   ]
 }
