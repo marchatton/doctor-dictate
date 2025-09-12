@@ -277,45 +277,56 @@ export function AudioWaveform({
         
         // Cleanup function to stop the loop
         return () => {
-          console.log('Cleaning up waveform effect');
+          console.log(`[Waveform-${instanceIdRef.current}] Effect cleanup for loop #${currentLoopId} (effectId: ${effectId})`);
           isRunningRef.current = false; // Stop the animation loop
           
           if (animationFrameRef.current) {
+            console.log(`[Waveform-${instanceIdRef.current}] Cancelling animation frame in cleanup`);
             cancelAnimationFrame(animationFrameRef.current);
             animationFrameRef.current = undefined;
           }
           
           if (sourceRef.current) {
+            console.log(`[Waveform-${instanceIdRef.current}] Disconnecting source in cleanup`);
             sourceRef.current.disconnect();
             sourceRef.current = undefined;
           }
           
           if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+            console.log(`[Waveform-${instanceIdRef.current}] Closing audio context in cleanup (state: ${audioContextRef.current.state})`);
             audioContextRef.current.close().catch(err => {
-              console.error('Error closing audio context:', err);
+              console.error(`[Waveform-${instanceIdRef.current}] Error closing audio context:`, err);
             });
           }
         };
       } catch (error) {
-        console.error('AudioWaveform: Error initializing audio analysis:', error);
+        console.error(`[Waveform-${instanceIdRef.current}] Error initializing audio analysis:`, error);
         setBars([15, 20, 25, 20, 15]); // Reset to default on error
       }
     } else {
       // Not recording - reset to default bars
+      console.log(`[Waveform-${instanceIdRef.current}] Not recording, cleaning up (effectId: ${effectId})`);
       setBars([15, 20, 25, 20, 15]); // Reset to lower default bars
       
       // Clean up audio resources
       if (sourceRef.current) {
+        console.log(`[Waveform-${instanceIdRef.current}] Disconnecting source (not recording)`);
         sourceRef.current.disconnect();
         sourceRef.current = undefined;
       }
       
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        console.log(`[Waveform-${instanceIdRef.current}] Closing audio context (not recording, state: ${audioContextRef.current.state})`);
         audioContextRef.current.close().catch(err => {
-          console.error('Error closing audio context:', err);
+          console.error(`[Waveform-${instanceIdRef.current}] Error closing audio context:`, err);
         });
       }
     }
+    
+    // Return cleanup for effect END logging
+    return () => {
+      console.log(`[Waveform-${instanceIdRef.current}] Effect END (${effectId})`);
+    };
   }, [isActive, audioStream]);
   if (!isActive) {
     return <div className="text-stone-400 italic flex items-center gap-2 px-4 py-2 bg-white bg-opacity-50 rounded-full">

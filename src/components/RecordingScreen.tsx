@@ -63,19 +63,33 @@ export function RecordingScreen({
     
     const initializeMediaRecorder = async () => {
       // Prevent multiple initializations
-      if (!mounted || mediaRecorder) return;
+      if (!mounted || mediaRecorder) {
+        console.log('[RecordingScreen] Skipping initialization - mounted:', mounted, 'hasRecorder:', !!mediaRecorder);
+        return;
+      }
       
       try {
-        console.log('Requesting microphone access...');
+        console.log('[RecordingScreen] Requesting microphone access...');
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         
         if (!mounted) {
           // Component unmounted while waiting for permission
+          console.log('[RecordingScreen] Component unmounted during getUserMedia, cleaning up stream');
           stream.getTracks().forEach(track => track.stop());
           return;
         }
         
-        console.log('Microphone access granted, stream:', stream);
+        console.log('[RecordingScreen] Microphone access granted', {
+          streamId: stream.id,
+          active: stream.active,
+          tracks: stream.getTracks().map(t => ({
+            id: t.id,
+            kind: t.kind,
+            label: t.label,
+            enabled: t.enabled,
+            readyState: t.readyState
+          }))
+        });
         
         setAudioStream(stream);
         
@@ -101,13 +115,17 @@ export function RecordingScreen({
           mimeType: selectedMimeType,
           audioBitsPerSecond: 128000 // 128 kbps for good quality
         });
-        console.log('MediaRecorder created with MIME type:', selectedMimeType, recorder);
+        console.log('[RecordingScreen] MediaRecorder created', {
+          mimeType: selectedMimeType,
+          state: recorder.state,
+          audioBitsPerSecond: 128000
+        });
         
         // Store the selected MIME type for later use when creating the Blob
         mimeTypeRef.current = selectedMimeType;
         
         recorder.ondataavailable = (event) => {
-          console.log('Audio data available, size:', event.data.size);
+          console.log('[RecordingScreen] Audio data available, size:', event.data.size);
           if (event.data.size > 0) {
             audioChunksRef.current.push(event.data);
           }
@@ -242,19 +260,31 @@ export function RecordingScreen({
         };
         
         setMediaRecorder(recorder);
+        console.log('[RecordingScreen] Media recorder setup complete');
       } catch (error) {
-        console.error('Error accessing microphone:', error);
+        console.error('[RecordingScreen] Error accessing microphone:', error);
       }
     };
     
+    console.log('[RecordingScreen] Starting initialization...');
     initializeMediaRecorder();
     
     // Cleanup function
     return () => {
+      console.log('[RecordingScreen] Component unmounting, cleaning up...');
       mounted = false;
       if (stream) {
-        console.log('Cleaning up media stream...');
-        stream.getTracks().forEach(track => track.stop());
+        console.log('[RecordingScreen] Cleaning up media stream', {
+          streamId: stream.id,
+          tracks: stream.getTracks().map(t => ({
+            id: t.id,
+            readyState: t.readyState
+          }))
+        });
+        stream.getTracks().forEach(track => {
+          console.log(`[RecordingScreen] Stopping track ${track.id}`);
+          track.stop();
+        });
       }
     };
   }, []); // Empty dependency array - only run once on mount
@@ -318,13 +348,22 @@ export function RecordingScreen({
                   audioChunksRef.current = []; // Clear any previous chunks
                   mediaRecorder.start(1000); // Collect data every second
                   onStartRecording();
-                  console.log('Started recording with MediaRecorder, state:', mediaRecorder.state);
+                  console.log('[RecordingScreen] Started recording', {
+                    recorderState: mediaRecorder.state,
+                    streamActive: audioStream?.active,
+                    streamId: audioStream?.id,
+                    tracks: audioStream?.getTracks().map(t => ({
+                      id: t.id,
+                      enabled: t.enabled,
+                      readyState: t.readyState
+                    }))
+                  });
                 } catch (error) {
-                  console.error('Failed to start MediaRecorder:', error);
+                  console.error('[RecordingScreen] Failed to start MediaRecorder:', error);
                   alert('Failed to start recording. Please check microphone permissions and try again.');
                 }
               } else {
-                console.warn('MediaRecorder not ready:', {
+                console.warn('[RecordingScreen] MediaRecorder not ready:', {
                   exists: !!mediaRecorder,
                   state: mediaRecorder?.state
                 });
@@ -339,10 +378,15 @@ export function RecordingScreen({
         ) : (
           <button 
             onClick={() => {
-              console.log('Stop button clicked, mediaRecorder:', mediaRecorder);
-              console.log('MediaRecorder state:', mediaRecorder?.state);
+              console.log('[RecordingScreen] Stop button clicked', {
+                hasRecorder: !!mediaRecorder,
+                recorderState: mediaRecorder?.state,
+                streamActive: audioStream?.active,
+                streamId: audioStream?.id
+              });
               if (mediaRecorder) {
                 if (mediaRecorder.state === 'recording') {
+                  console.log('[RecordingScreen] Stopping MediaRecorder...');
                   mediaRecorder.stop();
                 }
                 onStopRecording();

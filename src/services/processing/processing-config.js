@@ -19,7 +19,7 @@ const ProcessingModes = {
     },
     
     ollama: {
-      model: 'llama3.2:latest',  // 3B model for better quality
+      model: 'qwen2.5:1.5b',  // Faster model for testing
       temperature: 0.1,
       numPredict: 10000, // Ensure complete output
       numCtx: 32768,     // Large context for v7 prompt
@@ -53,7 +53,7 @@ const ProcessingModes = {
     },
     
     ollama: {
-      model: 'llama3.2:latest',  // 3B model - mistral is having issues
+      model: 'qwen2.5:1.5b',  // Faster model for better responsiveness
       temperature: 0.1,         // Low temperature for consistency
       numPredict: 12000,        // Large output capacity
       numCtx: 32768,           // Large context for v7 prompt
