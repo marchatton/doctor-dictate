@@ -64,13 +64,16 @@ class MedicalPromptV2:
             'id': 'complex_full',
             'input': "Identification comma John Smith is a 14 year old male with a history of ACHD and major depressive disorder period He's in the seventh grade period Chief complaint follow up period Next paragraph Problem list colon ACHD period Improving comma partial control period Two comma major depressive disorder comma stable period Current medications comma Lexapro 20 mg comma one pill per day comma jurn APM comma 60 milli comma qhs period",
             'output': """# Identification
-John Smith is a 14 year old male with a history of ADHD and major depressive disorder. He's in the seventh grade.
 
-**CC:** Follow-up
+### Identification
+John Smith is a 14 year old male with a history of ADHD and Major Depressive Disorder. He's in the seventh grade.
+
+### CC
+Follow-up
 
 ## Problem List
 1. ADHD: Improving, partial control
-2. Major depressive disorder: stable
+2. Major Depressive Disorder: stable
 
 ## Current Medications
 1. Lexapro 20mg (daily)
