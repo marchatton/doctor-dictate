@@ -50,3 +50,4 @@ console.log(`mmdc -i ${outputDir}/diagram-6.mmd -o ${outputDir}/data-flow.png`);
 console.log(`mmdc -i ${outputDir}/diagram-7.mmd -o ${outputDir}/prompt-generation.png`);
 console.log(`mmdc -i ${outputDir}/diagram-8.mmd -o ${outputDir}/error-handling.png`);
 
+

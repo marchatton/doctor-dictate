@@ -1,6 +1,6 @@
 /**
- * Whisper.cpp integration for fast transcription
- * Uses native C++ implementation for better performance
+ * whisper-cli integration for fast transcription
+ * Uses native C++ implementation (Whisper.cpp) for better performance
  */
 
 const { spawn } = require('child_process');
@@ -23,7 +23,7 @@ class WhisperCpp {
     }
     
     /**
-     * Find whisper.cpp executable
+     * Find whisper-cli executable
      */
     findWhisperExecutable() {
         // Check common locations (whisper-cli is the new name)
@@ -34,13 +34,13 @@ class WhisperCpp {
             '/usr/local/bin/whisper',
             'whisper-cli' // Rely on PATH
         ];
-        
+
         for (const execPath of possiblePaths) {
             if (fs.existsSync(execPath)) {
                 return execPath;
             }
         }
-        
+
         // Default to PATH lookup
         return 'whisper-cli';
     }
@@ -162,7 +162,7 @@ class WhisperCpp {
                 args.push('--max-context', String(options.maxContext));
             }
             
-            console.log(`🎤 Transcribing with whisper.cpp (${this.model})...`);
+            console.log(`🎤 Transcribing with whisper-cli (${this.model})...`);
             const whisper = spawn(this.whisperPath, args);
             
             let output = '';
@@ -236,7 +236,7 @@ class WhisperCpp {
     }
     
     /**
-     * Check if whisper.cpp is available
+     * Check if whisper-cli is available
      */
     async isAvailable() {
         return new Promise((resolve) => {

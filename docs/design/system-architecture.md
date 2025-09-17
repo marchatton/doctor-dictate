@@ -24,7 +24,7 @@ graph TB
     end
 
     subgraph "External Services"
-        WCPP[Whisper.cpp Binary]
+        WCPP[whisper-cli Binary]
         OLLAMASRV[Ollama Server<br/>localhost:11434]
     end
 
@@ -76,7 +76,7 @@ sequenceDiagram
     Electron->>Electron: Convert to WAV if needed
     
     Note over WhisperCpp: Stage 2: Transcription
-    Electron->>WhisperCpp: Execute whisper-cpp
+    Electron->>WhisperCpp: Execute whisper-cli
     WhisperCpp->>WhisperCpp: Transcribe audio
     WhisperCpp-->>Electron: Raw transcript
     
@@ -378,7 +378,7 @@ src/
 - **Electron**: Desktop application framework
 - **React**: UI framework
 - **TypeScript**: Type safety
-- **Whisper.cpp**: Local transcription
+- **whisper-cli**: Local transcription (Whisper.cpp)
 - **Ollama**: Local LLM formatting
 
 ### Key Libraries

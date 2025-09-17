@@ -31,7 +31,7 @@ DoctorDictate addresses the documentation burden faced by medical professionals 
 ## 🛠️ Technology Stack
 
 - **Frontend**: Electron + React + TypeScript + Tailwind CSS
-- **AI Transcription**: Whisper.cpp (tiny.en/base.en models)
+- **AI Transcription**: whisper-cli (base.en/small.en models)
 - **AI Formatting**: Ollama with Qwen 2.5 (1.5B model) or Llama 3.2 (3B model)
 - **Audio**: Web Audio API with real-time visualization
 - **Architecture**: Template-driven medical note formatting
@@ -40,24 +40,57 @@ DoctorDictate addresses the documentation burden faced by medical professionals 
 
 ## 📋 Prerequisites
 
-- Node.js 18+ and npm
-- macOS (optimized for Apple Silicon)
-- Ollama installed and running locally
-- Whisper.cpp (optional, falls back to Python Whisper)
+### Required Software
+- **Node.js 18+** and npm
+- **macOS** (optimized for Apple Silicon, Intel also supported)
+- **Homebrew** - Package manager for macOS
+- **FFmpeg** - For audio format conversion
+- **Ollama** - For local AI medical text formatting
+- **whisper-cli** - For fast local transcription (Whisper.cpp)
+
+### System Requirements
 - Microphone access
-- ~4GB free disk space (for models)
-- ~2GB RAM for processing
+- ~4GB free disk space (for AI models)
+- ~4GB RAM for processing
+- Internet connection (only for initial setup)
 
 ## 🚀 Quick Start
 
-### 1. Clone and Install
+### 1. Install System Dependencies
+
+#### macOS (with Homebrew)
+```bash
+# Install Homebrew if not already installed
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install FFmpeg for audio processing
+brew install ffmpeg
+
+# Install whisper-cli (Whisper.cpp) for transcription
+brew install whisper-cpp
+
+# Download Whisper models
+# Note: whisper-cli replaces the deprecated whisper-cpp command
+# For FAST mode:
+whisper-cli-download-ggml base.en
+# For ACCURATE mode:
+whisper-cli-download-ggml small.en
+```
+
+#### macOS (without Homebrew)
+If Homebrew is not available, you can:
+1. Download FFmpeg from https://ffmpeg.org/download.html
+2. Build Whisper.cpp from source: https://github.com/ggerganov/whisper.cpp
+3. Add binaries to your PATH
+
+### 2. Clone and Install
 ```bash
 git clone <repository-url>
 cd doctor-dictate
 npm install
 ```
 
-### 2. Install Ollama and Models
+### 3. Install Ollama and Models
 ```bash
 # Install Ollama from https://ollama.ai
 # Start Ollama service
@@ -71,12 +104,12 @@ ollama pull llama3.2:latest  # More capable model (optional)
 curl http://localhost:11434/api/tags
 ```
 
-### 3. Development Mode
+### 4. Development Mode
 ```bash
 npm run dev
 ```
 
-### 4. Build Application
+### 5. Build Application
 ```bash
 npm run build
 npm run dist  # Create distributable
@@ -158,7 +191,7 @@ npm run test -- --coverage
 ### Current (V1.1)
 - ✅ React/TypeScript modern UI
 - ✅ Real-time audio waveform visualization
-- ✅ Whisper.cpp integration for fast transcription
+- ✅ whisper-cli integration for fast transcription
 - ✅ Ollama LLM integration for medical formatting
 - ✅ Template-driven note structure
 - ✅ Dual processing modes (Fast/Accurate)
@@ -170,18 +203,59 @@ npm run test -- --coverage
 ### Processing Modes
 
 **Fast Mode** (3-4 min for 30-min audio)
-- Whisper tiny.en model
+- Whisper base.en model (141 MB)
 - Qwen 2.5 (1.5B) formatting
 - 85% accuracy
 - 2-3GB RAM usage
 - Best for quick drafts
 
 **Accurate Mode** (6-8 min for 30-min audio)
-- Whisper base.en model
+- Whisper small.en model (244 MB)
 - Qwen 2.5 (1.5B) or Llama 3.2 (3B) formatting
 - 95% accuracy
 - 3.5-4.5GB RAM usage
 - Best for final documentation
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+#### FFmpeg not found error
+```bash
+# macOS with Homebrew
+brew install ffmpeg
+
+# macOS without Homebrew
+# Download from https://ffmpeg.org/download.html
+# Add to PATH: export PATH="/path/to/ffmpeg/bin:$PATH"
+```
+
+#### Whisper models not found
+```bash
+# Create models directory
+mkdir -p ~/.whisper-cpp/models
+
+# Download models manually if whisper-cli-download-ggml fails
+cd ~/.whisper-cpp/models
+curl -L -o ggml-base.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+curl -L -o ggml-small.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin
+```
+
+#### Ollama connection error
+```bash
+# Ensure Ollama is running
+ollama serve
+
+# Check if Ollama is accessible
+curl http://localhost:11434/api/tags
+
+# If port 11434 is blocked, check firewall settings
+```
+
+#### Microphone access denied
+1. Go to System Preferences → Security & Privacy → Privacy → Microphone
+2. Ensure Terminal/Electron has microphone access
+3. Restart the application after granting permission
 
 ## 🤝 Contributing
 

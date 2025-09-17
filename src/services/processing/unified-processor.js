@@ -70,15 +70,15 @@ class UnifiedProcessor {
   }
   
   async transcribe(audioPath) {
-    // Try whisper.cpp first, fallback to Python whisper if not available
+    // Try whisper-cli first, fallback to Python whisper if not available
     const whisperCpp = new WhisperCpp(this.config.whisper);
     const isWhisperCppAvailable = await whisperCpp.isAvailable();
-    
+
     if (isWhisperCppAvailable) {
-      console.log(`✅ Using whisper.cpp with ${this.config.whisper.model} model`);
+      console.log(`✅ Using whisper-cli with ${this.config.whisper.model} model`);
       return whisperCpp.transcribe(audioPath);
     } else {
-      console.log('⚠️ Whisper.cpp not found, using Python whisper');
+      console.log('⚠️ whisper-cli not found, using Python whisper');
       // Fallback to existing Python whisper
       const transcriber = new WhisperTranscriber();
       const modelName = this.config.whisper.model.replace('.en', ''); // Remove .en suffix for Python

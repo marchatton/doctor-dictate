@@ -9,9 +9,9 @@ const ProcessingModes = {
   FAST: {
     name: 'Fast',
     description: 'Quick draft - 3-4 minutes for 30-min audio',
-    
+
     whisper: {
-      model: 'tiny.en',
+      model: 'base.en',
       threads: os.cpus().length - 2,
       parallel: 4,
       chunkSize: 15,  // seconds
@@ -43,9 +43,9 @@ const ProcessingModes = {
   ACCURATE: {
     name: 'High Accuracy',
     description: 'Best quality - 6-8 minutes for 30-min audio',
-    
+
     whisper: {
-      model: 'base.en',  // Or small.en if RAM allows
+      model: 'small.en',
       threads: os.cpus().length - 2,
       parallel: 2,       // Less parallel for stability
       chunkSize: 30,     // Larger chunks for context
