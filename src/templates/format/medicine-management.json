@@ -1,0 +1,203 @@
+{
+  "id": "medicine-management",
+  "name": "Medicine Management Follow-up",
+  "description": "Standard template for psychiatric medication management visits",
+  "version": "1.0",
+  "sections": [
+    {
+      "id": "identification",
+      "title": "Identification",
+      "required": true,
+      "format": "paragraph",
+      "patterns": ["^identification", "^patient", "^\\w+ \\w+ is a \\d+"],
+      "description": "Patient demographics and history",
+      "example": "John Smith is a 14 year old male with a history of ADHD and Major Depressive Disorder. He is in the 7th grade."
+    },
+    {
+      "id": "cc",
+      "title": "CC",
+      "required": true,
+      "format": "single-line",
+      "patterns": ["^chief complaint", "^cc", "^follow[- ]?up"],
+      "description": "Chief complaint",
+      "example": "Follow-up"
+    },
+    {
+      "id": "problem-list",
+      "title": "Problem List",
+      "required": true,
+      "format": "numbered-list",
+      "patterns": ["^problem list", "^problemist", "^problems"],
+      "itemFormat": "{Diagnosis} – {status}",
+      "description": "Active diagnoses with status",
+      "example": [
+        "ADHD – improving, partial control",
+        "Major Depressive Disorder – stable"
+      ]
+    },
+    {
+      "id": "current-meds",
+      "title": "Current Meds",
+      "required": true,
+      "format": "numbered-list",
+      "patterns": ["^current med", "^current medication", "^medications"],
+      "itemFormat": "{Name} {Dosage} ({Frequency})",
+      "description": "Current medications",
+      "example": [
+        "Lexapro 20mg (one pill per day)",
+        "Jornay PM 60mg (QHS)"
+      ]
+    },
+    {
+      "id": "interim-history",
+      "title": "Interim History",
+      "required": true,
+      "format": "bullet-list",
+      "patterns": ["^interim history", "^interim"],
+      "description": "Clinical updates since last visit",
+      "example": [
+        "ADHD in fair control in the interim period",
+        "Mood: okay, interest: good, energy: good, concentration: fair, appetite: unchanged",
+        "No suicidal thoughts. Finds Lexapro helpful",
+        "More social interactions in the interim"
+      ]
+    },
+    {
+      "id": "past-medical-history",
+      "title": "Past Medical History",
+      "required": false,
+      "format": "paragraph",
+      "patterns": ["^past medical", "^pmh", "^past history"],
+      "default": "No changes.",
+      "description": "Past medical history updates"
+    },
+    {
+      "id": "social-history",
+      "title": "Social History",
+      "required": false,
+      "format": "paragraph",
+      "patterns": ["^social history", "^social"],
+      "default": "See HPI.",
+      "description": "Social history updates"
+    },
+    {
+      "id": "family-history",
+      "title": "Family History",
+      "required": false,
+      "format": "paragraph",
+      "patterns": ["^family history", "^family"],
+      "default": "No changes. No knowledge of maternal/paternal family hx of sudden cardiac death/unexplained death or cardiac issues in relatives under age 50.",
+      "description": "Family history updates"
+    },
+    {
+      "id": "ros",
+      "title": "ROS",
+      "required": true,
+      "format": "bullet-list",
+      "patterns": ["^ros", "^review of systems"],
+      "description": "Review of systems",
+      "default": [
+        "General: Denies weight changes",
+        "CVS: No CP or palpitations",
+        "CNS: No dizziness, lightheadedness, falls, or LOC",
+        "ROS negative except as noted above"
+      ]
+    },
+    {
+      "id": "vitals",
+      "title": "Vitals",
+      "required": false,
+      "format": "paragraph",
+      "patterns": ["^vital", "^bp", "^blood pressure"],
+      "description": "Vital signs",
+      "example": "Vital signs are stable.\nMM/DD/YYYY Height: X, Weight: X, BP: X, HR: X."
+    },
+    {
+      "id": "mse",
+      "title": "MSE",
+      "required": true,
+      "format": "paragraph",
+      "patterns": ["^mse", "^mental status"],
+      "description": "Mental status examination",
+      "templateSpecific": ["Include both suicidal and homicidal ideation assessment"]
+    },
+    {
+      "id": "risk-assessment",
+      "title": "Risk Assessment",
+      "required": true,
+      "format": "paragraph",
+      "patterns": ["^risk assessment", "^risk"],
+      "description": "Risk assessment",
+      "templateSpecific": ["Use 'imminently' not 'immediately' for risk timing"]
+    },
+    {
+      "id": "assessment",
+      "title": "Assessment",
+      "required": true,
+      "format": "bullet-list",
+      "patterns": ["^assessment", "^clinical assessment"],
+      "description": "Clinical assessment points",
+      "constraints": ["Use Title Case for diagnoses"]
+    },
+    {
+      "id": "plan",
+      "title": "Plan",
+      "required": true,
+      "format": "bullet-list",
+      "patterns": ["^plan", "^treatment plan"],
+      "description": "Treatment plan",
+      "default": [
+        "Discussed diagnoses, clinical impressions, and treatment recommendations"
+      ]
+    },
+    {
+      "id": "therapy-notes",
+      "title": "Therapy Notes",
+      "required": false,
+      "format": "paragraph",
+      "patterns": ["^therapy notes", "^therapy"],
+      "default": "N/a",
+      "description": "Additional therapy notes"
+    }
+  ],
+  "formatting": {
+    "sectionHeaderLevel": 3,
+    "sectionHeaderPrefix": "###",
+    "sectionSeparator": "\n\n",
+    "listItemPrefix": {
+      "numbered": "{n}. ",
+      "bullet": "- "
+    },
+    "medicationFormat": "{Name} {Dosage} ({Frequency})",
+    "problemFormat": "{Diagnosis} – {status}",
+    "signatureFormat": "*Signed by {Name}, MD on {Date}*",
+    "dateFormat": "MMM/DD/YYYY",
+    "listSeparators": {
+      "problem": " – ",
+      "medication": " ",
+      "default": ": "
+    }
+  },
+  "templateSpecificRules": [
+    {
+      "section": "Problem List",
+      "rule": "Use numbered list with diagnosis – status format"
+    },
+    {
+      "section": "Current Meds", 
+      "rule": "Format as: Name Dosage (frequency in patient's words)"
+    },
+    {
+      "section": "Interim History",
+      "rule": "Use bullet points for clinical observations"
+    },
+    {
+      "section": "MSE",
+      "rule": "Include both suicidal and homicidal ideation assessment"
+    },
+    {
+      "section": "Risk Assessment",
+      "rule": "Use 'imminently' not 'immediately' for risk timing"
+    }
+  ]
+}

@@ -118,20 +118,20 @@ describe('RecordingScreen Component', () => {
   });
 
   describe('Whisper Model Selection', () => {
-    it('should set Whisper model to medium.en for high accuracy', async () => {
+    it('should set Whisper model to small.en for high accuracy', async () => {
       render(<RecordingScreen {...mockProps} />);
       
       await waitFor(() => {
-        expect(window.electronAPI.setWhisperModel).toHaveBeenCalledWith('medium.en');
+        expect(window.electronAPI.setWhisperModel).toHaveBeenCalledWith('small.en');
       });
     });
 
-    it('should set Whisper model to small.en for lower accuracy', async () => {
+    it('should set Whisper model to tiny.en for lower accuracy', async () => {
       const lowAccuracyProps = { ...mockProps, isHighAccuracy: false };
       render(<RecordingScreen {...lowAccuracyProps} />);
       
       await waitFor(() => {
-        expect(window.electronAPI.setWhisperModel).toHaveBeenCalledWith('small.en');
+        expect(window.electronAPI.setWhisperModel).toHaveBeenCalledWith('tiny.en');
       });
     });
   });
@@ -142,7 +142,7 @@ describe('RecordingScreen Component', () => {
       
       // Verify component renders without errors
       await waitFor(() => {
-        expect(window.electronAPI.setWhisperModel).toHaveBeenCalledWith('medium.en');
+        expect(window.electronAPI.setWhisperModel).toHaveBeenCalledWith('small.en');
       });
     });
 

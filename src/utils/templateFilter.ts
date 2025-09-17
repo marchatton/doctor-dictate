@@ -105,9 +105,23 @@ function removeEmptyMarkdownSections(text: string): string {
         }
         
         // Check if this line has meaningful content
-        if (contentLine.trim() && !isTemplateLine(contentLine)) {
-          hasContent = true;
-          break;
+        // Be less aggressive - only remove if truly empty or just template placeholder
+        if (contentLine.trim() && contentLine.trim().length > 0) {
+          // If it contains actual content (numbers, colons, medical info, lists), keep it
+          if (contentLine.match(/^\d+\./) || // Numbered list
+              contentLine.match(/^-\s+/) || // Bullet list
+              contentLine.match(/\d/) || // Contains numbers
+              contentLine.includes(':') || // Contains colons (likely labels)
+              contentLine.includes('.') || // Contains periods (sentences)
+              contentLine.length > 20) { // Has substantial content
+            hasContent = true;
+            break;
+          }
+          // Only skip if it's purely a template phrase
+          if (!isTemplateLine(contentLine)) {
+            hasContent = true;
+            break;
+          }
         }
         j++;
       }
@@ -118,8 +132,12 @@ function removeEmptyMarkdownSections(text: string): string {
       // Skip this header if no content found
     } else {
       // Not a header, include if it has content
-      if (line.trim() && !isTemplateLine(line)) {
-        result.push(line);
+      // Be less aggressive here too
+      if (line.trim()) {
+        // Only skip lines that are purely template phrases
+        if (!isTemplateLine(line) || line.includes(':') || line.match(/\d/)) {
+          result.push(line);
+        }
       } else if (line.trim() === '') {
         // Preserve some empty lines for formatting
         result.push(line);
@@ -179,23 +197,46 @@ export function extractMedications(text: string): string[] {
 }
 
 export function countMedicalTerms(text: string): number {
-  // Count potential medical terms (simplified)
-  const medicalPatterns = [
-    /\b(?:adhd|depression|anxiety|bipolar|ptsd|ocd)\b/gi,
-    /\b\w+\s+\d+\s*mg\b/gi,
-    /\b(?:diagnosis|symptoms|treatment|therapy|medication)\b/gi,
-    /\b(?:patient|clinical|medical|psychiatric)\b/gi
+  return extractMedicalTerms(text).length;
+}
+
+export function extractMedicalTerms(text: string): string[] {
+  // Extract medical terms but exclude medications (which have their own section)
+  const medicalTermPatterns = [
+    /\b(?:adhd|depression|anxiety|bipolar|ptsd|ocd|autism|schizophrenia|mania|hypomania|major depressive disorder)\b/gi,
+    /\b(?:diagnosis|psychotherapy|counseling)\b/gi,
+    /\b(?:psychiatric|psychological|mental health)\b/gi
   ];
   
-  let count = 0;
-  medicalPatterns.forEach(pattern => {
+  // Exclude medication-like patterns (these go in medications section)
+  const medicationPatterns = [
+    /\b\w+\s+\d+\s*mg\b/gi,
+    /\b(?:medication|meds|pills|dosage|prescription)\b/gi
+  ];
+  
+  const termsFound = new Set<string>();
+  
+  // Add medical terms
+  medicalTermPatterns.forEach(pattern => {
     const matches = text.match(pattern);
     if (matches) {
-      count += matches.length;
+      matches.forEach(match => {
+        termsFound.add(match.toLowerCase().trim());
+      });
     }
   });
   
-  return count;
+  // Remove any medication-related terms
+  medicationPatterns.forEach(pattern => {
+    const matches = text.match(pattern);
+    if (matches) {
+      matches.forEach(match => {
+        termsFound.delete(match.toLowerCase().trim());
+      });
+    }
+  });
+  
+  return Array.from(termsFound);
 }
 
 export function extractPatientName(text: string): string {
@@ -215,8 +256,12 @@ export function extractPatientName(text: string): string {
       const nameMatch = pattern.exec(text);
       if (nameMatch && nameMatch[1]) {
         const name = nameMatch[1].trim();
-        // Basic validation - should be 2-30 chars, not common words
-        const commonWords = ['patient', 'client', 'therapy', 'session', 'treatment', 'follow', 'up'];
+        // Basic validation - should be 2-30 chars, not common words  
+        const commonWords = ['patient', 'client', 'therapy', 'session', 'treatment', 'follow', 'up', 
+                            'improved', 'better', 'progress', 'reports', 'medication', 'anxiety', 
+                            'depression', 'symptoms', 'visit', 'appointment', 'doctor', 'psychiatrist',
+                            'mood', 'sleep', 'focus', 'school', 'work', 'home', 'family', 'stress',
+                            'improving', 'stable', 'control', 'current', 'continue', 'monitor'];
         if (name.length >= 2 && name.length <= 30 && !commonWords.includes(name.toLowerCase())) {
           return name;
         }

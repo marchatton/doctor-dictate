@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
-const { WhisperTranscriber } = require('./whisper.js');
+const { WhisperTranscriber } = require('./services/transcription/whisper.js');
 
 // Keep a global reference of the window object
 let mainWindow;
@@ -312,19 +312,35 @@ ipcMain.handle('set-whisper-model', async (event, model) => {
 
 ipcMain.handle('transcribe-audio', async (event, audioFilePath) => {
   try {
+    console.log('🔍 MAIN IPC - Starting transcription for:', audioFilePath);
     const result = await whisperTranscriber.transcribeAudio(audioFilePath, (progress) => {
       // Send progress updates to renderer
       event.sender.send('transcription-progress', progress);
     });
     
+    console.log('🔍 MAIN IPC - Transcription complete, result keys:', Object.keys(result));
+    console.log('🔍 MAIN IPC - Available transcript options:');
+    console.log('  formatted length:', result.formatted?.length);
+    console.log('  corrected length:', result.corrected?.length);
+    console.log('  raw length:', result.raw?.length);
+    
     // The frontend expects a 'transcript' property
-    return { 
+    const transcript = result.formatted || result.corrected || result.raw;
+    console.log('🔍 MAIN IPC - Selected transcript source:', 
+      result.formatted ? 'formatted' : result.corrected ? 'corrected' : 'raw');
+    console.log('🔍 MAIN IPC - Final transcript length:', transcript?.length);
+    console.log('🔍 MAIN IPC - Final transcript preview:', transcript?.substring(0, 100) + '...');
+    
+    const response = { 
       success: true, 
-      transcript: result.formatted || result.corrected || result.raw,
+      transcript: transcript,
       ...result 
     };
+    
+    console.log('🔍 MAIN IPC - Returning response with transcript length:', response.transcript?.length);
+    return response;
   } catch (error) {
-    console.error('Error transcribing audio:', error);
+    console.error('🔍 MAIN IPC - Error transcribing audio:', error);
     // Ensure processing state is reset on error
     whisperTranscriber.resetProcessingState();
     return { success: false, error: error.message };

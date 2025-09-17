@@ -1,8 +1,82 @@
 // Local Medical Dictionary for DoctorDictate
 // Contains psychiatric medications, conditions, and terminology
 // All data stored locally - no external dependencies
+// THIS IS THE SINGLE SOURCE OF TRUTH FOR MEDICAL CORRECTIONS
 
 const medicalDictionary = {
+  // Important medication preservation rule
+  preservationRules: {
+    medications: "NEVER swap brand names with generics or vice versa",
+    dosing: "Keep exact dosing language as dictated",
+    format: "Use standard format: Name Dosage (Frequency)"
+  },
+  
+  // Common transcription errors and corrections
+  corrections: {
+    // Medication name corrections (preserve brand vs generic)
+    medications: {
+      'journey': 'Jornay PM',
+      'journay': 'Jornay PM',
+      'john apm': 'Jornay PM',
+      'john a p m': 'Jornay PM',
+      'luxapro': 'Lexapro',
+      'lexipro': 'Lexapro',
+      'lexepro': 'Lexapro',
+      'violence': 'Vyvanse',
+      'vyvance': 'Vyvanse',
+      'adderall': 'Adderall',
+      'aderall': 'Adderall',
+      'adderal': 'Adderall'
+    },
+    
+    // Medical abbreviations - should be capitalized
+    abbreviations: {
+      'adhd': 'ADHD',
+      'mdd': 'MDD',
+      'odd': 'ODD',
+      'ptsd': 'PTSD',
+      'gad': 'GAD',
+      'ocd': 'OCD',
+      'qhs': 'QHS',
+      'bid': 'BID',
+      'tid': 'TID',
+      'qid': 'QID',
+      'prn': 'PRN',
+      'ssri': 'SSRI',
+      'snri': 'SNRI',
+      'cvs': 'CVS',
+      'cns': 'CNS',
+      'bp': 'BP',
+      'hr': 'HR',
+      'lOC': 'LOC',
+      'cp': 'CP',
+      'ros': 'ROS',
+      'mse': 'MSE'
+    },
+    
+    // Common phrase corrections
+    phrases: {
+      'problemist': 'problem list',
+      'problem ist': 'problem list',
+      'current meditations': 'current medications',
+      'current meds': 'current medications',
+      'false': 'falls',
+      'intend': 'intent',
+      'coma of': 'comorbid',
+      'achd': 'ADHD',
+      'psych': 'Psychiatry',
+      'generalize': 'Generalized',
+      'major depressive': 'Major Depressive',
+      'adhd combined': 'ADHD Combined'
+    },
+    
+    // Date/Number corrections
+    numbers: {
+      'oh nine oh': '09/0',
+      'oh seven': '07/',
+      'oh': '0'
+    }
+  },
   // Psychiatric Medications by Category
   medications: {
     // SSRIs (Selective Serotonin Reuptake Inhibitors)

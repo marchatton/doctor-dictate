@@ -1,0 +1,153 @@
+{
+  "id": "psychiatry-follow-up",
+  "name": "Psychiatry Follow-up Note",
+  "description": "Standard template for psychiatric follow-up appointments",
+  "version": "1.0",
+  "sections": [
+    {
+      "id": "identification",
+      "title": "Identification",
+      "required": true,
+      "format": "paragraph",
+      "description": "Patient demographics and history",
+      "example": "John Smith is a 14 year old male with a history of ADHD and Major Depressive Disorder. He is in the 7th grade."
+    },
+    {
+      "id": "cc",
+      "title": "CC",
+      "required": true,
+      "format": "single-line",
+      "description": "Chief complaint",
+      "example": "Follow-up"
+    },
+    {
+      "id": "problem-list",
+      "title": "Problem List",
+      "required": true,
+      "format": "numbered-list",
+      "description": "Active diagnoses with status",
+      "itemFormat": "{Diagnosis} – {status}",
+      "example": [
+        "ADHD – improving, partial control",
+        "Major Depressive Disorder – stable"
+      ]
+    },
+    {
+      "id": "current-meds",
+      "title": "Current Meds",
+      "required": true,
+      "format": "numbered-list",
+      "description": "Current medications",
+      "itemFormat": "{Name} {Dosage} ({Frequency})",
+      "example": [
+        "Lexapro 20mg (one pill per day)",
+        "Jornay PM 60mg (QHS)"
+      ]
+    },
+    {
+      "id": "interim-history",
+      "title": "Interim History",
+      "required": true,
+      "format": "bullet-list",
+      "description": "Clinical updates since last visit",
+      "example": [
+        "ADHD in fair control in the interim period",
+        "Mood: okay, interest: good, energy: good",
+        "No suicidal thoughts"
+      ]
+    },
+    {
+      "id": "past-medical-history",
+      "title": "Past Medical History",
+      "required": false,
+      "format": "paragraph",
+      "default": "No changes.",
+      "description": "Past medical history updates"
+    },
+    {
+      "id": "social-history",
+      "title": "Social History",
+      "required": false,
+      "format": "paragraph",
+      "default": "See HPI.",
+      "description": "Social history updates"
+    },
+    {
+      "id": "family-history",
+      "title": "Family History",
+      "required": false,
+      "format": "paragraph",
+      "default": "No changes. No knowledge of maternal/paternal family hx of sudden cardiac death/unexplained death or cardiac issues in relatives under age 50.",
+      "description": "Family history updates"
+    },
+    {
+      "id": "ros",
+      "title": "ROS",
+      "required": true,
+      "format": "bullet-list",
+      "description": "Review of systems",
+      "default": [
+        "General: Denies weight changes",
+        "CVS: No CP or palpitations",
+        "CNS: No dizziness, lightheadedness, falls, or LOC",
+        "ROS negative except as noted above"
+      ]
+    },
+    {
+      "id": "vitals",
+      "title": "Vitals",
+      "required": false,
+      "format": "bullet-list",
+      "description": "Vital signs",
+      "example": [
+        "Vital signs are stable",
+        "MM/DD/YYYY Height: X, Weight: X, BP: X, HR: X"
+      ]
+    },
+    {
+      "id": "mse",
+      "title": "MSE",
+      "required": true,
+      "format": "paragraph",
+      "description": "Mental status examination",
+      "constraints": ["Include assessment of suicidal and homicidal ideation"]
+    },
+    {
+      "id": "risk-assessment",
+      "title": "Risk Assessment",
+      "required": true,
+      "format": "paragraph",
+      "description": "Risk assessment"
+    },
+    {
+      "id": "assessment",
+      "title": "Assessment",
+      "required": true,
+      "format": "bullet-list",
+      "description": "Clinical assessment points"
+    },
+    {
+      "id": "plan",
+      "title": "Plan",
+      "required": true,
+      "format": "bullet-list",
+      "description": "Treatment plan",
+      "default": [
+        "Discussed diagnoses, clinical impressions, and treatment recommendations"
+      ]
+    },
+    {
+      "id": "therapy-notes",
+      "title": "Therapy Notes",
+      "required": false,
+      "format": "paragraph",
+      "default": "N/a",
+      "description": "Additional therapy notes"
+    }
+  ],
+  "formatting": {
+    "sectionHeaderLevel": 3,
+    "sectionSeparator": "\n\n",
+    "signatureFormat": "*Signed by {Name}, MD on {Date}*"
+  }
+}
