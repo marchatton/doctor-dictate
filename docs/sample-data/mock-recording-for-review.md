@@ -24,7 +24,7 @@ Follow-up
 2. Jornay PM 60mg (QHS)
 
 ### Interim History
-- ADHD in fair control in the interim period. Had improved symptoms after increase in the course period. Better control of symptoms in school period. Reduced control after 4 to 5 pm period.
+- ADHD in fair control in the interim. Had improved symptoms after increase in dose. Better control of symptoms in school period. Reduced control after 4 to 5 pm.
 - Mood: okay. Interest: good, energy: good, concentration: fair. Appetite: unchanged. No suicidal thoughts. Finds Lexapro helpful. More social interactions in the interim period.
 - Taking and tolerating medications without daytime sedation or other side effects.
 - Participating in recommended psychotherapies.

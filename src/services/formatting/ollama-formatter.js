@@ -4,6 +4,8 @@
  */
 
 const { MedicalPrompt } = require('../../prompts');
+const fs = require('fs');
+const path = require('path');
 
 class OllamaFormatter {
     constructor(config = {}) {
@@ -11,11 +13,39 @@ class OllamaFormatter {
         this.model = config.model || this.selectOptimalModel();
         this.isAvailable = null; // Cache availability status
         this.temperature = config.temperature || 0.1;
-        
+
         // Store config for dynamic adjustment
         this.config = config;
+
+        // Try to load static prompt
+        this.staticPrompt = this.loadStaticPrompt();
     }
-    
+
+    /**
+     * Load the pre-built static prompt
+     */
+    loadStaticPrompt() {
+        try {
+            // Try .md file first (user's updated version)
+            const mdPath = path.join(__dirname, '../../prompts/compiled/medicine-management-prompt.md');
+            if (fs.existsSync(mdPath)) {
+                const prompt = fs.readFileSync(mdPath, 'utf8');
+                console.log('✅ Static prompt loaded successfully from .md');
+                return prompt;
+            }
+
+            // Fallback to .txt file
+            const txtPath = path.join(__dirname, '../../prompts/compiled/medicine-management-prompt.txt');
+            const prompt = fs.readFileSync(txtPath, 'utf8');
+            console.log('✅ Static prompt loaded successfully from .txt');
+            return prompt;
+        } catch (error) {
+            console.warn('⚠️ Static prompt not found, will use dynamic generation');
+            console.warn('  Run "npm run build-prompt" to generate static prompt');
+            return null;
+        }
+    }
+
     /**
      * Select optimal model based on what's available
      */
@@ -240,21 +270,32 @@ class OllamaFormatter {
             };
         }
         
-        // Initialize prompt generator
-        const { promptGenerator } = await this.initializePrompt();
-        if (!promptGenerator) {
-            console.error('❌ Failed to initialize prompt generator');
-            return {
-                success: false,
-                formatted: messyText,
-                error: 'Failed to initialize prompt generator',
-                model: this.model
-            };
+        // Use static prompt if available, otherwise fall back to dynamic
+        let prompt;
+        let promptVersion;
+
+        if (this.staticPrompt) {
+            // Use pre-built static prompt
+            prompt = this.staticPrompt.replace('[INSERT_DICTATION_HERE]', messyText);
+            promptVersion = 'static-v1';
+            console.log('🔍 Using static prompt');
+        } else {
+            // Fall back to dynamic generation
+            const { promptGenerator } = await this.initializePrompt();
+            if (!promptGenerator) {
+                console.error('❌ Failed to initialize prompt generator');
+                return {
+                    success: false,
+                    formatted: messyText,
+                    error: 'Failed to initialize prompt generator',
+                    model: this.model
+                };
+            }
+            prompt = promptGenerator.generatePrompt(messyText);
+            promptVersion = 'v7';
+            console.log('🔍 Using v7 dynamic prompt system');
         }
-        
-        const prompt = promptGenerator.generatePrompt(messyText);
-        
-        console.log(`🔍 Using v7 prompt system`);
+
         console.log(`🔍 Model: ${this.model}, Temperature: ${this.temperature}`);
         console.log('📝 PROMPT LENGTH:', prompt.length, 'characters');
         
@@ -284,7 +325,7 @@ class OllamaFormatter {
                 success: true,
                 formatted: cleanedText,
                 model: this.model,
-                promptVersion: 'v7'
+                promptVersion: promptVersion
             };
         } catch (error) {
             console.error('❌ Formatting failed:', error.message);

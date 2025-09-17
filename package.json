@@ -20,7 +20,8 @@
     "test:coverage": "jest --coverage",
     "test:ci": "jest --coverage --watchAll=false --passWithNoTests",
     "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix"
+    "lint:fix": "eslint src/ --fix",
+    "build-prompt": "node src/prompts/static-prompt-builder.js"
   },
   "repository": {
     "type": "git",
