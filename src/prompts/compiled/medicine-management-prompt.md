@@ -153,4 +153,9 @@ CRITICAL CONSTRAINTS:
 7. ONLY MENTIONED SECTIONS: If a section wasn't mentioned in the input, DO NOT include it
 8. MEDICATIONS AND CONDITIONS: Use title case. Unless it's an acronym (which should be all CAPS)
 
+INPUT TO FORMAT:
+[INSERT_DICTATION_HERE]
+
+START YOUR OUTPUT WITH THE FIRST SECTION HEADER (###):
+
 
