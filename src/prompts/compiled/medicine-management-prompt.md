@@ -15,24 +15,27 @@
   
 == CRITICAL RULES - MUST FOLLOW ==
 1. NEVER hallucinate or add content that wasn't dictated
-2. ONLY include sections that were explicitly mentioned in the dictation
+2. ONLY include sections that were explicitly mentioned AND have content in the dictation
 3. DO NOT add ANY sections with "Not mentioned" or "Not provided" text
 4. DO NOT create sections from context (e.g., don't create Assessment from Problem List)
-5. Preserve the order of sections, as in the dictation.
+5. Preserve the order of sections, as in the dictation. If the dictation differs from the template order, follow the dictation order.
 6. DO NOT add sections that weren't mentioned (no "No X provided" statements)
 7. Preserve ALL dictated information exactly - do not omit anything
 8. DO NOT add treatment recommendations, side effects, or clinical observations not dictated
-9. Use ### for section headers
+9. Use ### for section headers ONLY when there is content to follow
 10. Follow the exact formatting rules for each section
 11. When unclear about medication names or any other details, mark with {unclear: transcription}
 12. Replace dictated punctuation artifacts like "period" with "." and "comma" with ","
+13. SKIP EMPTY SECTIONS: If a section header is mentioned but no content follows, omit the entire section
+14. NO PLACEHOLDER TEXT: Never add "No additional information provided" or similar placeholder text
 
 == SECTION DETECTION RULES ==
-CRITICAL: Each of these triggers creates a SEPARATE section, never merge:
-- "identification" → ### Identification (then stop, new section starts)
-- "chief complaint" or "cc" → ### CC (separate section)
-- "problemist" or "problem list" → ### Problem List (separate section)
-- If you hear multiple triggers in sequence, create multiple sections
+CRITICAL: Each of these triggers creates a SEPARATE section ONLY IF content follows:
+- "identification" → ### Identification (only if patient info follows)
+- "chief complaint" or "cc" → ### CC (only if complaint follows)
+- "problemist" or "problem list" → ### Problem List (only if problems follow)
+- If you hear multiple triggers in sequence, create multiple sections WITH CONTENT ONLY
+- IMPORTANT: Hearing a section name alone is NOT enough - there must be actual content
 
 Abbreviations (always uppercase):
   "adhd" → "ADHD"
@@ -156,6 +159,10 @@ CRITICAL CONSTRAINTS:
 INPUT TO FORMAT:
 [INSERT_DICTATION_HERE]
 
-START YOUR OUTPUT WITH THE FIRST SECTION HEADER (###):
+IMPORTANT OUTPUT INSTRUCTIONS:
+- START YOUR OUTPUT WITH THE FIRST SECTION HEADER (###) THAT HAS CONTENT
+- ONLY output sections that have actual dictated content
+- DO NOT create empty sections or sections with placeholder text
+- If a section was mentioned but has no content, SKIP IT ENTIRELY
 
 
