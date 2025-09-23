@@ -7,6 +7,7 @@
 // Import the current version (v7 is latest)
 const { MedicalPromptV7, TemplateLoader } = require('./medical-prompt-v7');
 const { SectionDetector } = require('./section-detector');
+const { SectionManifestBuilder } = require('./section-manifest-builder');
 
 // Export with stable names (no version numbers)
 module.exports = {
@@ -20,6 +21,7 @@ module.exports = {
   // Other exports
   TemplateLoader,
   SectionDetector,
+  SectionManifestBuilder,
   
   // Version info
   CURRENT_VERSION: '7.0',

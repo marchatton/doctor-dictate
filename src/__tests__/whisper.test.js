@@ -18,19 +18,19 @@ jest.mock('../data/medical-dictionary.js', () => ({
   correctTerm: jest.fn((term) => term)
 }));
 
-jest.mock('../dictation-commands.js', () => ({
+jest.mock('../data/dictation-commands.js', () => ({
   DictationCommandProcessor: jest.fn().mockImplementation(() => ({
     processCommands: jest.fn((text) => text)
   }))
 }));
 
-jest.mock('../audio-processor.js', () => ({
+jest.mock('../services/audio/processor.js', () => ({
   AudioProcessor: jest.fn().mockImplementation(() => ({
     prepareAudio: jest.fn().mockResolvedValue('/tmp/prepared-audio.wav')
   }))
 }));
 
-jest.mock('../transcription-progress.js', () => ({
+jest.mock('../services/transcription/progress-tracker.js', () => ({
   TranscriptionProgress: jest.fn().mockImplementation(() => ({
     updateProgress: jest.fn(),
     complete: jest.fn()
@@ -52,8 +52,8 @@ describe('WhisperTranscriber', () => {
     path.join = jest.fn((...args) => args.join('/'));
     
     // Import after mocking
-    delete require.cache[require.resolve('../whisper.js')];
-    WhisperTranscriber = require('../whisper.js').WhisperTranscriber || require('../whisper.js');
+    delete require.cache[require.resolve('../services/transcription/whisper.js')];
+    WhisperTranscriber = require('../services/transcription/whisper.js').WhisperTranscriber || require('../services/transcription/whisper.js');
   });
 
   describe('Initialization', () => {
@@ -323,7 +323,7 @@ describe('WhisperTranscriber', () => {
 // Simple module export test
 describe('Module Export', () => {
   it('should export WhisperTranscriber', () => {
-    const whisperModule = require('../whisper.js');
+    const whisperModule = require('../services/transcription/whisper.js');
     expect(whisperModule).toBeDefined();
   });
 });

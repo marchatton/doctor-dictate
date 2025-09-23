@@ -6,7 +6,11 @@ const { ProcessorFactory } = require('../services/processing/unified-processor')
 const fs = require('fs');
 const path = require('path');
 
-describe('E2E Medical Dictation Workflow', () => {
+// Full pipeline requires Whisper/Ollama runtime; opt-in via RUN_FULL_PIPELINE=true
+const RUN_FULL_PIPELINE = process.env.RUN_FULL_PIPELINE === 'true';
+const describeE2E = RUN_FULL_PIPELINE ? describe : describe.skip;
+
+describeE2E('E2E Medical Dictation Workflow', () => {
   const testDataDir = path.join(__dirname, '..', '..', 'docs', 'sample-data');
   const testAudioPath = path.join(testDataDir, 'mock recording-samir.m4a');
   

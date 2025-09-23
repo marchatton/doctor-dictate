@@ -35,8 +35,8 @@ describe('AudioProcessor', () => {
     os.tmpdir = jest.fn(() => '/tmp');
     
     // Import after mocking
-    delete require.cache[require.resolve('../audio-processor.js')];
-    const module = require('../audio-processor.js');
+    delete require.cache[require.resolve('../services/audio/processor.js')];
+    const module = require('../services/audio/processor.js');
     AudioProcessor = module.AudioProcessor || module;
   });
 
@@ -383,7 +383,7 @@ describe('AudioProcessor', () => {
 // Simple module export test
 describe('Module Export', () => {
   it('should export AudioProcessor class', () => {
-    const audioModule = require('../audio-processor.js');
+    const audioModule = require('../services/audio/processor.js');
     expect(audioModule).toBeDefined();
   });
 });
