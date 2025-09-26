@@ -17,6 +17,12 @@ class MedicalPromptV7 {
    * Generate concise, effective prompt
    */
   generatePrompt(dictationText, options = {}) {
+    const { manifest } = options;
+
+    if (manifest && manifest.entries && manifest.entries.length > 0) {
+      return this.generateStructuredPrompt(dictationText, manifest, options);
+    }
+
     // No preprocessing - let LLM handle it
     // Build a concise but complete prompt
     const sections = this.template.sections.map(s => 
@@ -69,6 +75,78 @@ ${dictationText}
 
 OUTPUT:`;
     
+    return prompt;
+  }
+
+  generateStructuredPrompt(dictationText, manifest, options = {}) {
+    const manifestLines = manifest.entries.map((entry, index) => {
+      const required = entry.templateSection ? entry.templateSection.required : false;
+      const origin = entry.type === 'known' ? 'template-section' : 'speaker-defined-section';
+      const format = entry.format || 'paragraph';
+      const guidance = entry.type === 'known'
+        ? 'Follow template rules. Maintain dictated content verbatim.'
+        : 'Keep dictated title and content exactly as provided; do not rename.';
+      const contentRange = entry.contentRange || { start: 0, end: 0 };
+
+      return `  {
+    "order": ${index},
+    "key": "${entry.key}",
+    "title": "${entry.title}",
+    "format": "${format}",
+    "required": ${required},
+    "origin": "${origin}",
+    "dictationRange": { "start": ${contentRange.start}, "end": ${contentRange.end} },
+    "guidance": "${guidance}"
+  }`;
+    }).join(',\n');
+
+    const jsonSchema = `Return ONLY valid JSON using this schema:
+{
+  "sections": [
+    {
+      "key": string,            // use the key provided above
+      "title": string,          // repeat the title exactly as given
+      "body": string,           // formatted content for that section
+      "confidence": number      // 0-1 confidence in placement
+    }
+  ],
+  "uncategorized": [string]    // any fragments you could not place (optional)
+}`;
+
+    const instructions = `You MUST:
+1. Preserve dictation order — process entries in the order listed above.
+2. Include only sections present in the manifest. No additional sections allowed.
+3. Omit any section whose body would be empty.
+4. Do NOT invent content. Every word must come from the dictation.
+5. Keep medication names, doses, and abbreviations exactly as dictated.
+6. If unsure about a medication spelling, wrap it in braces (e.g., {Journay PM}).`;
+
+    const prompt = `Format the dictation into structured JSON.
+
+SECTION MANIFEST (process in this order):
+[
+${manifestLines}
+]
+
+${instructions}
+
+DICTATION COMMAND CONVERSIONS:
+- "period" → "." (except literal use like "interim period")
+- "comma" → ","
+- "colon" → ":"
+- "next line" → line break within section
+- "next paragraph"/"new paragraph" → new bullet or sentence as appropriate
+
+${jsonSchema}
+
+CORRECTIONS TO APPLY (use exact casing shown):
+${JSON.stringify(this.corrections, null, 2)}
+
+RAW DICTATION (do not alter order):
+${dictationText}
+
+Respond with JSON only.`;
+
     return prompt;
   }
   

@@ -3,7 +3,9 @@
  * Simplified version - trusts LLM and v7 prompt to handle medical formatting properly
  */
 
-const { MedicalPrompt } = require('../../prompts');
+const { MedicalPrompt, SectionManifestBuilder } = require('../../prompts');
+const { parseStructuredResponse } = require('./structured-response-parser');
+const { renderStructuredMarkdown } = require('./structured-renderer');
 const fs = require('fs');
 const path = require('path');
 
@@ -19,6 +21,7 @@ class OllamaFormatter {
 
         // Try to load static prompt
         this.staticPrompt = this.loadStaticPrompt();
+        this.manifestBuilder = null;
     }
 
     /**
@@ -273,6 +276,7 @@ class OllamaFormatter {
         // Use static prompt if available, otherwise fall back to dynamic
         let prompt;
         let promptVersion;
+        const manifest = options.manifest || null;
 
         if (this.staticPrompt) {
             // Use pre-built static prompt
@@ -291,7 +295,7 @@ class OllamaFormatter {
                     model: this.model
                 };
             }
-            prompt = promptGenerator.generatePrompt(messyText);
+            prompt = promptGenerator.generatePrompt(messyText, { manifest });
             promptVersion = 'v7';
             console.log('🔍 Using v7 dynamic prompt system');
         }
@@ -299,6 +303,8 @@ class OllamaFormatter {
         console.log(`🔍 Model: ${this.model}, Temperature: ${this.temperature}`);
         console.log('📝 PROMPT LENGTH:', prompt.length, 'characters');
         
+        const useStructuredPipeline = Boolean(manifest && manifest.entries && manifest.entries.length > 0);
+
         try {
             const formattedText = await this.generateCompletion(prompt, {
                 temperature: this.temperature,
@@ -318,7 +324,10 @@ class OllamaFormatter {
                 };
             }
             
-            // Simple post-processing
+            if (useStructuredPipeline) {
+                return this.handleStructuredResponse(formattedText, messyText, manifest, promptVersion, template);
+            }
+
             const cleanedText = this.postProcessResponse(formattedText);
             
             return {
@@ -347,7 +356,31 @@ class OllamaFormatter {
             };
         }
     }
-    
+
+    handleStructuredResponse(responseText, originalText, manifest, promptVersion, template) {
+        try {
+            const parsed = parseStructuredResponse(responseText, manifest);
+            const rendered = renderStructuredMarkdown(parsed, manifest, template);
+            return {
+                success: true,
+                formatted: rendered,
+                structured: parsed,
+                model: this.model,
+                promptVersion,
+                manifest
+            };
+        } catch (error) {
+            console.error('❌ Failed to parse structured response:', error.message);
+            return {
+                success: false,
+                formatted: originalText,
+                error: `Failed to parse structured response: ${error.message}`,
+                model: this.model,
+                manifest
+            };
+        }
+    }
+
     /**
      * Initialize prompt system if not already initialized
      */
