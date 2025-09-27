@@ -10,7 +10,8 @@ describe('renderStructuredMarkdown', () => {
   const manifest = {
     entries: [
       { key: 'identification', title: 'Identification', format: 'paragraph' },
-      { key: 'custom-sleep-hygiene', title: 'Sleep Hygiene', format: 'bullet-list' }
+      { key: 'custom-sleep-hygiene', title: 'Sleep Hygiene', format: 'bullet-list' },
+      { key: 'current-meds', title: 'Current Meds', format: 'numbered-list', id: 'current-meds' }
     ]
   };
 
@@ -54,5 +55,21 @@ describe('renderStructuredMarkdown', () => {
     expect(markdown).toContain('### Uncategorized');
     expect(markdown).toContain('- Raw fragment');
   });
-});
 
+  it('normalizes medications and flags uncertain names', () => {
+    const structured = {
+      sections: [
+        {
+          key: 'current-meds',
+          body: '1. Jordan APM 60 mg (qhs)\n2. Lexapro 20 mg (qhs)'
+        }
+      ],
+      uncategorized: []
+    };
+
+    const markdown = renderStructuredMarkdown(structured, manifest, template);
+
+    expect(markdown).toContain('{Jornay PM}');
+    expect(markdown).toContain('Lexapro 20 mg (QHS)');
+  });
+});

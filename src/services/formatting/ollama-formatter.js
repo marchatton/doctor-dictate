@@ -273,12 +273,15 @@ class OllamaFormatter {
             };
         }
         
+        const manifest = options.manifest || null;
+        const useStructuredPipeline = Boolean(manifest && manifest.entries && manifest.entries.length > 0);
+        const forceDynamicPrompt = useStructuredPipeline;
+
         // Use static prompt if available, otherwise fall back to dynamic
         let prompt;
         let promptVersion;
-        const manifest = options.manifest || null;
 
-        if (this.staticPrompt) {
+        if (this.staticPrompt && !forceDynamicPrompt) {
             // Use pre-built static prompt
             prompt = this.staticPrompt.replace('[INSERT_DICTATION_HERE]', messyText);
             promptVersion = 'static-v1';
@@ -303,8 +306,6 @@ class OllamaFormatter {
         console.log(`🔍 Model: ${this.model}, Temperature: ${this.temperature}`);
         console.log('📝 PROMPT LENGTH:', prompt.length, 'characters');
         
-        const useStructuredPipeline = Boolean(manifest && manifest.entries && manifest.entries.length > 0);
-
         try {
             const formattedText = await this.generateCompletion(prompt, {
                 temperature: this.temperature,
@@ -325,6 +326,7 @@ class OllamaFormatter {
             }
             
             if (useStructuredPipeline) {
+                const template = await this.getTemplate();
                 return this.handleStructuredResponse(formattedText, messyText, manifest, promptVersion, template);
             }
 
@@ -393,9 +395,19 @@ class OllamaFormatter {
             console.log('  ✓ Template loaded:', template.name || 'medicine-management');
             
             this.promptGenerator = new MedicalPrompt(template);
+            this.template = template;
             console.log('  ✓ V7 prompt generator initialized');
         }
-        return { promptGenerator: this.promptGenerator };
+        return { promptGenerator: this.promptGenerator, template: this.template };
+    }
+
+    async getTemplate() {
+        if (this.template) {
+            return this.template;
+        }
+        const { TemplateLoader } = require('../../prompts');
+        this.template = TemplateLoader.load('medicine-management');
+        return this.template;
     }
     
     /**

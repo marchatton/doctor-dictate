@@ -1,4 +1,5 @@
 const DEFAULT_HEADER_PREFIX = '###';
+const { normalizeSectionBody } = require('./structured-normalizer');
 
 function getHeaderPrefix(template) {
   const formatting = template?.formatting || {};
@@ -16,8 +17,12 @@ function splitLines(body) {
     .filter((line) => line.length > 0);
 }
 
+function stripListPrefix(line) {
+  return line.replace(/^\s*(?:\d+\.\s+|[-*+]\s+)/, '').trim();
+}
+
 function renderList(body, style) {
-  const lines = splitLines(body);
+  const lines = splitLines(body).map(stripListPrefix);
   if (lines.length === 0) return '';
 
   if (style === 'numbered-list') {
@@ -56,20 +61,21 @@ function shouldSkipSection(section) {
 function renderStructuredMarkdown(structuredPayload, manifest, template) {
   const headerPrefix = getHeaderPrefix(template);
   const sectionsByKey = new Map((structuredPayload.sections || []).map((section) => [section.key, section]));
-  const lines = [];
+    const lines = [];
 
-  (manifest.entries || []).forEach((entry) => {
-    const section = sectionsByKey.get(entry.key);
-    if (shouldSkipSection(section)) return;
+    (manifest.entries || []).forEach((entry) => {
+      const section = sectionsByKey.get(entry.key);
+      if (shouldSkipSection(section)) return;
 
-    const title = normalizeTitle(entry, section);
-    const format = entry.format || section.manifestEntry?.format || 'paragraph';
-    const body = renderSectionBody(section.body, format);
-    if (!body) return;
+      const title = normalizeTitle(entry, section);
+      const format = entry.format || section.manifestEntry?.format || 'paragraph';
+      let body = renderSectionBody(section.body, format);
+      body = normalizeSectionBody(body, entry);
+      if (!body) return;
 
-    lines.push(`${headerPrefix} ${title}`);
+      lines.push(`${headerPrefix} ${title}`);
 
-    if (format === 'single-line') {
+      if (format === 'single-line') {
       lines.push(body);
     } else {
       lines.push(body);
@@ -95,4 +101,3 @@ function renderStructuredMarkdown(structuredPayload, manifest, template) {
 module.exports = {
   renderStructuredMarkdown
 };
-
