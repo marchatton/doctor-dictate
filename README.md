@@ -7,6 +7,7 @@ DoctorDictate is a macOS desktop app for clinicians who need accurate, private, 
 - Template-driven formatting that preserves dictated medical terminology
 - Dual Fast/Accurate modes with real-time audio waveform feedback
 - Built for privacy-first workflows and short turnaround documentation
+- Manifest-guided LLM formatting that returns structured JSON before deterministic rendering
 
 ## Feature Snapshot
 - Real-time recording UI with Web Audio API visualization
@@ -14,7 +15,7 @@ DoctorDictate is a macOS desktop app for clinicians who need accurate, private, 
 - Local LLM formatting via Ollama (Qwen 2.5 1.5B or Llama 3.2 3B)
 - Dictation command handling ("comma", "colon", etc.)
 - Hallucination guardrails: only outputs sections that were spoken
-- Export to structured Markdown using medical templates
+- JSON-first formatting workflow with manifest-aware prompts and deterministic Markdown rendering
 
 ## Tech Stack
 - **UI & Framework**: Electron, React, TypeScript, Tailwind CSS
@@ -75,11 +76,12 @@ DoctorDictate is a macOS desktop app for clinicians who need accurate, private, 
 - `npm test`, `npm run test:watch`, `npm run test:coverage` – Jest suites and coverage
 - `npm run lint`, `npm run lint:fix` – ESLint checks
 - `npm run build-prompt` – regenerate static prompt artifacts
+- `RUN_FULL_PIPELINE=true npx jest` – opt-in to full pipeline tests (whisper/ollama integration)
 
 ## Testing & Quality
 - Follow the TDD loop (`Red → Green → Refactor`) for every change
 - Tests target behavior through public APIs using Jest + React Testing Library
-- Maintain coverage with `npm run test:coverage` before submitting changes
+- Maintain coverage with `npm run test:coverage` before submitting changes, and run the prompt/parser/renderer/verifier suites when updating formatting logic
 - Reference `AGENTS.md` for agent workflows and strict TypeScript/immutability rules
 
 ## Project Layout
@@ -111,6 +113,7 @@ dist*/                             # Build artifacts
 - Context isolation and vetted IPC handlers protect renderer access (`src/ipc/`).
 - No external API calls—audio, transcription, and formatting stay on-device.
 - Store large recordings outside Git and keep `.env` files local only.
+- Formatter logs include manifest summaries, structured-response parsing status, and content-verifier reports to surface potential gaps quickly.
 
 ## Contributing
 Contributions are welcome! Review the agent playbook in `AGENTS.md` before opening a PR. The project uses Conventional Commits (e.g., `feat:`, `fix:`) and expects lint, test, and coverage checks with each submission.
