@@ -132,6 +132,9 @@ graph TB
     subgraph "Formatting Services"
         OllamaFormatter[ollama-formatter.js]
         ContentVerifier[content-verifier.js]
+        StructuredParser[structured-response-parser.js]
+        StructuredRenderer[structured-renderer.js]
+        StructuredNormalizer[structured-normalizer.js]
     end
 
     subgraph "Processing Services"
@@ -144,6 +147,9 @@ graph TB
     WhisperTranscriber --> AudioProcessor
     WhisperTranscriber --> ProgressTracker
     OllamaFormatter --> ContentVerifier
+    OllamaFormatter --> StructuredParser
+    OllamaFormatter --> StructuredRenderer
+    StructuredRenderer --> StructuredNormalizer
 ```
 
 ### 3. Prompt System (`/src/prompts/`)
@@ -207,6 +213,24 @@ flowchart TB
     Response --> Verify[Content Verification]
     Verify --> Output[Final Output]
 ```
+
+### Structured Formatting Flow (v7+)
+
+```mermaid
+flowchart LR
+    Manifest[Section Manifest
+(SectionDetector + template)] --> PromptGen[MedicalPromptV7
+JSON contract]
+    PromptGen --> OllamaJSON[Ollama JSON response]
+    OllamaJSON --> Parser[structured-response-parser]
+    Parser --> Renderer[structured-renderer]
+    Renderer --> Normalizer[structured-normalizer]
+    Normalizer --> Markdown[Deterministic Markdown]
+    Markdown --> Verifier[ContentVerifier.verifyStructuredNote]
+    Verifier --> Result[Verified Output + Report]
+```
+
+Formatter logs capture manifest headers, JSON parsing success/failure, deterministic rendering summaries, and verification reports so content gaps are visible during development and support sessions.
 
 ## API Interactions
 
@@ -289,6 +313,8 @@ event.sender.send('transcription-progress', progress)
   "templateSpecificRules": [...]
 }
 ```
+
+Optional sections mark `"autoFill": false` to ensure the formatter never emits default prose when the clinician omits that section in the dictation.
 
 ## Error Handling
 
