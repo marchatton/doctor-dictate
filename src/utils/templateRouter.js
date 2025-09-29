@@ -25,7 +25,7 @@ class TemplateRouter {
    */
   parseTranscript(text) {
     const result = {};
-    let cleaned = text.replace(/Sample progress note,?\s*/i, '');
+    const cleaned = text.replace(/Sample progress note,?\s*/i, '');
     
     // Try both structured and natural extraction, prefer natural for richer content
     result.identification = this.extractIdentificationStructured(cleaned) || this.extractIdentificationNatural(cleaned);
@@ -196,12 +196,10 @@ class TemplateRouter {
     medPatterns.forEach(pattern => {
       const matches = text.matchAll(pattern);
       for (const match of matches) {
-        let name, dose, frequency;
-        
         const matchText = match[0].toLowerCase();
-        dose = match[1];
-        
-        // Determine frequency
+        const dose = match[1];
+
+        let frequency;
         if (matchText.includes('bedtime') || matchText.includes('before bed') || matchText.includes('qhs')) {
           frequency = 'QHS';
         } else if (matchText.includes('morning')) {
@@ -209,8 +207,8 @@ class TemplateRouter {
         } else {
           frequency = 'daily';
         }
-        
-        // Determine medication name/type
+
+        let name;
         if (match[2]) {
           // Named or typed medication
           const medType = match[2].toLowerCase();
@@ -225,19 +223,16 @@ class TemplateRouter {
           } else {
             name = `[${medType.charAt(0).toUpperCase() + medType.slice(1)}]`;
           }
+        } else if (dose === '20' && frequency === 'daily') {
+          name = '[Antidepressant]'; // Common 20mg antidepressant
+        } else if (dose === '60' && frequency === 'QHS') {
+          name = '[Quetiapine]'; // Common bedtime antipsychotic
+        } else if (dose === '25' && frequency === 'daily') {
+          name = '[Anxiety medication]'; // Common anxiety med dose
+        } else if (['10', '15', '20', '30'].includes(dose) && frequency.includes('AM')) {
+          name = '[Stimulant]'; // Common stimulant doses
         } else {
-          // Generic medication by dosage
-          if (dose === '20' && frequency === 'daily') {
-            name = '[Antidepressant]'; // Common 20mg antidepressant
-          } else if (dose === '60' && frequency === 'QHS') {
-            name = '[Quetiapine]'; // Common bedtime antipsychotic
-          } else if (dose === '25' && frequency === 'daily') {
-            name = '[Anxiety medication]'; // Common anxiety med dose
-          } else if (['10', '15', '20', '30'].includes(dose) && frequency.includes('AM')) {
-            name = '[Stimulant]'; // Common stimulant doses
-          } else {
-            name = '[Unknown medication]';
-          }
+          name = '[Unknown medication]';
         }
         
         const key = `${name}-${dose}-${frequency}`;
@@ -331,7 +326,6 @@ class TemplateRouter {
    */
   extractMedicationsStructured(text) {
     const medications = [];
-    const seenMedications = new Set(); // Prevent duplicates
     
     // Handle messy format: "Current medications. Lexapro [unclear_name] 20 mg (one pill per day). Chorn APM. Jordan APM, 60 mg, QHS."
     

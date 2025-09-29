@@ -636,11 +636,9 @@ const medicalDictionary = {
       'TS': 'Tourette Syndrome',
       'ED': 'Eating Disorder',
       'SUD': 'Substance Use Disorder',
-      'GAD': 'Generalized Anxiety Disorder',
-      'SAD': 'Social Anxiety Disorder',
+      'SAD': 'Social Anxiety Disorder / Seasonal Affective Disorder',
       'PD': 'Panic Disorder',
       'SCZ': 'Schizophrenia',
-      'SAD': 'Seasonal Affective Disorder',
       'PMDD': 'Premenstrual Dysphoric Disorder',
       'PMS': 'Premenstrual Syndrome',
       'PME': 'Premenstrual Exacerbation',
@@ -745,7 +743,7 @@ const medicalDictionary = {
       
       // Check common errors
       for (const category of Object.values(medicalDictionary.medications)) {
-        for (const [medName, medInfo] of Object.entries(category)) {
+        for (const medInfo of Object.values(category)) {
           if (medInfo.commonErrors && medInfo.commonErrors.includes(normalizedName)) {
             return true;
           }
@@ -820,7 +818,7 @@ const medicalDictionary = {
       const normalizedDosage = dosage.toLowerCase().trim();
       
       // Remove common errors
-      let corrected = normalizedDosage
+      const corrected = normalizedDosage
         .replace(/\s*mgs?\s*$/i, 'mg')
         .replace(/\s*mg's\s*$/i, 'mg')
         .replace(/\s*milligrams\s*$/i, 'mg')
@@ -868,7 +866,7 @@ const medicalDictionary = {
     // Get accuracy score for transcription
     getTranscriptionAccuracy: (transcript, expectedTerms) => {
       let correctCount = 0;
-      let totalCount = expectedTerms.length;
+      const totalCount = expectedTerms.length;
       const corrections = [];
       
       for (const expectedTerm of expectedTerms) {
@@ -904,17 +902,6 @@ const medicalDictionary = {
       };
     },
 
-    // Get medication information
-    getMedicationInfo: (name) => {
-      const normalizedName = name.toLowerCase().trim();
-      for (const category of Object.values(medicalDictionary.medications)) {
-        if (normalizedName in category) {
-          return category[normalizedName];
-        }
-      }
-      return null;
-    },
-
     // Check if a condition exists
     isCondition: (name) => {
       const normalizedName = name.toLowerCase().trim();
@@ -933,12 +920,6 @@ const medicalDictionary = {
         }
       }
       return null;
-    },
-
-    // Check if a dosage format is valid
-    isValidDosage: (dosage) => {
-      const dosagePattern = /^\d+(\.\d+)?\s*(mg|mcg|ml|g|tablet|capsule|injection|patch)$/i;
-      return dosagePattern.test(dosage);
     },
 
     // Get all medications in a category

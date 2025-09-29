@@ -95,7 +95,7 @@ async function runTests() {
   // Check if static prompt exists
   const promptPath = path.join(__dirname, '../src/prompts/compiled/medicine-management-prompt.txt');
   if (!fs.existsSync(promptPath)) {
-    console.error('❌ Static prompt not found! Run: npm run build-prompt');
+    console.error('❌ Static prompt not found! Run: pnpm run build-prompt');
     process.exit(1);
   }
 
@@ -205,7 +205,7 @@ async function runTests() {
 
   if (failed > 0) {
     console.log('\n⚠️ Some tests failed. The static prompt may need adjustments.');
-    console.log('💡 Try regenerating the prompt: npm run build-prompt');
+    console.log('💡 Try regenerating the prompt: pnpm run build-prompt');
   } else {
     console.log('\n🎉 All tests passed! The static prompt is working correctly.');
   }

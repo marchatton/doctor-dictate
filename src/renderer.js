@@ -478,7 +478,7 @@ class DoctorDictateApp {
         const exportBtn = document.getElementById('export-transcript-btn');
         const newRecordingBtn = document.getElementById('new-recording-btn');
         const transcriptText = document.getElementById('final-transcript-text');
-        
+
         if (editBtn && transcriptText) {
             editBtn.addEventListener('click', () => {
                 transcriptText.readOnly = false;
@@ -486,7 +486,15 @@ class DoctorDictateApp {
                 editBtn.textContent = 'Done editing';
             });
         }
-        
+
+        if (saveBtn && transcriptText) {
+            saveBtn.onclick = () => this.saveTranscript(transcriptText.value);
+        }
+
+        if (exportBtn && transcriptText) {
+            exportBtn.onclick = () => this.exportPDF(transcriptText.value);
+        }
+
         if (newRecordingBtn) {
             newRecordingBtn.addEventListener('click', () => {
                 this.startNewRecording();
@@ -516,7 +524,11 @@ class DoctorDictateApp {
         
         const corrections = result.corrections || [];
         const medications = result.medications || [];
-        const commands = result.dictationCommands || [];
+        const infoPanel = document.getElementById('transcription-info-panel');
+
+        if (!infoPanel) {
+            return;
+        }
         
         const correctionsText = corrections.length > 0 
             ? `${corrections.length} medical corrections applied` 
@@ -754,9 +766,14 @@ class DoctorDictateApp {
         }
     }
 
-    async saveTranscript() {
+    async saveTranscript(contentOverride) {
         try {
-            const content = document.getElementById('transcript-text').value;
+            const textElement = document.getElementById('final-transcript-text') || document.getElementById('transcript-text');
+            const content = typeof contentOverride === 'string' ? contentOverride : textElement?.value || '';
+            if (!content.trim()) {
+                this.showError('No transcript content available to save');
+                return;
+            }
             const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
             const filename = `transcript-${timestamp}.txt`;
             
@@ -775,9 +792,14 @@ class DoctorDictateApp {
         }
     }
 
-    async exportPDF() {
+    async exportPDF(contentOverride) {
         try {
-            const content = document.getElementById('transcript-text').value;
+            const textElement = document.getElementById('final-transcript-text') || document.getElementById('transcript-text');
+            const content = typeof contentOverride === 'string' ? contentOverride : textElement?.value || '';
+            if (!content.trim()) {
+                this.showError('No transcript content available to export');
+                return;
+            }
             const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
             const filename = `transcript-${timestamp}.pdf`;
             

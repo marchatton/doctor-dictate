@@ -264,7 +264,7 @@ FORMAT THE ABOVE DICTATION following ALL critical rules. Ensure EVERY section th
         }
         
         // Clean the text
-        let cleanedText = text
+        const cleanedText = text
             .replace(notePattern, '')
             .replace(/\n{3,}/g, '\n\n')
             .trim();

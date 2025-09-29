@@ -143,11 +143,12 @@ class WhisperTranscriber {
             
             processedAudio = await this.audioProcessor.processAudio(
                 audioFilePath,
-                (stage, percent, message) => {
-                    // Update progress during preprocessing
-                    if (progressCallback && progressTracker) {
-                        progressCallback(progressTracker.getProgress('preprocessing', percent));
+                (stage, percent) => {
+                    if (!progressCallback || !progressTracker) {
+                        return;
                     }
+                    const progressStage = stage === 'chunking' ? 'chunking' : 'preprocessing';
+                    progressCallback(progressTracker.getProgress(progressStage, percent));
                 }
             );
 
@@ -170,7 +171,7 @@ class WhisperTranscriber {
                     progressCallback(progressTracker.getProgress('transcribing', overallProgress));
                 }
                 
-                const chunkText = await this.runWhisper(chunk.path, null);
+                const chunkText = await this.runWhisper(chunk.path);
                 transcriptions.push({
                     text: chunkText,
                     overlap: chunk.overlap || 0,
@@ -182,7 +183,7 @@ class WhisperTranscriber {
                 if (currentTime - lastSaveTime > AUTOSAVE_INTERVAL) {
                     try {
                         const partialTranscript = this.audioProcessor.combineTranscriptions(transcriptions);
-                        await this.savePartialProgress(filePath, partialTranscript, i + 1, totalChunks);
+                        await this.savePartialProgress(audioFilePath, partialTranscript, i + 1, totalChunks);
                         lastSaveTime = currentTime;
                     } catch (error) {
                         console.warn('Auto-save failed:', error.message);
@@ -264,7 +265,7 @@ class WhisperTranscriber {
      * Run Whisper transcription on audio file
      * @private
      */
-    async runWhisper(audioFilePath, progressCallback) {
+    async runWhisper(audioFilePath) {
         // Use WhisperCpp service instead of Python
         const { WhisperCpp } = require('./whisper-cpp');
         
@@ -503,7 +504,7 @@ class WhisperTranscriber {
                 ? path.join(this.whisperEnvPath, 'Scripts', 'python.exe')
                 : path.join(this.whisperEnvPath, 'bin', 'python');
 
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
                 const testCmd = spawn(pythonExecutable, ['-m', 'whisper', '--help']);
                 
                 testCmd.on('close', (code) => {

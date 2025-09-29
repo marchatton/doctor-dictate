@@ -2,20 +2,14 @@
 
 DoctorDictate is a macOS desktop app for clinicians who need accurate, private, and fast medical dictation. All audio, transcription, and formatting happen locally so protected health information never leaves your device.
 
-## Highlights
+## Core Capabilities
 - Local Whisper.cpp transcription with no cloud dependencies
 - Template-driven formatting that preserves dictated medical terminology
-- Dual Fast/Accurate modes with real-time audio waveform feedback
-- Built for privacy-first workflows and short turnaround documentation
-- Manifest-guided LLM formatting that returns structured JSON before deterministic rendering
-
-## Feature Snapshot
-- Real-time recording UI with Web Audio API visualization
-- Whisper-cli integration (base.en and small.en models)
+- Dual Fast/Accurate modes with real-time waveform feedback in the recorder UI
+- Dictation command handling ("comma", "colon", etc.) for hands-free editing
+- Manifest-guided JSON-first formatting that renders deterministic Markdown
+- Hallucination guardrails that only emit sections present in the dictation
 - Local LLM formatting via Ollama (Qwen 2.5 1.5B or Llama 3.2 3B)
-- Dictation command handling ("comma", "colon", etc.)
-- Hallucination guardrails: only outputs sections that were spoken
-- JSON-first formatting workflow with manifest-aware prompts and deterministic Markdown rendering
 
 ## Tech Stack
 - **UI & Framework**: Electron, React, TypeScript, Tailwind CSS
@@ -24,23 +18,25 @@ DoctorDictate is a macOS desktop app for clinicians who need accurate, private, 
 - **Audio**: Web Audio API
 - **Tooling**: Vite, Jest, ESLint, electron-builder
 
-## Requirements
+## Prerequisites
 - macOS (Apple Silicon optimized; Intel supported)
 - Node.js 18+ and npm
-- Homebrew (recommended), FFmpeg, whisper-cli, Ollama
+- Homebrew (recommended) with FFmpeg and Whisper.cpp CLI support
+- Ollama runtime with at least one local model (Qwen 2.5 1.5B or Llama 3.2 3B)
+- pnpm 10.17+ (global installation for dependency management)
 - ~4 GB disk space and ~4 GB RAM for model workloads
 - Microphone access (grant in System Settings)
 
-## Getting Started
-1. **Install dependencies**
+## Setup
+1. **Install Homebrew tooling** (skip if already installed)
    ```bash
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
    brew install ffmpeg whisper-cpp
    ```
-   - Use `scripts/download-whisper-models.sh` or run `whisper-cli-download-ggml base.en` and `whisper-cli-download-ggml small.en`.
-   - Manual installs are possible via the FFmpeg and Whisper.cpp repositories if Homebrew is unavailable.
+   Whisper models can be fetched via `scripts/download-whisper-models.sh` or
+   `whisper-cli-download-ggml base.en` and `whisper-cli-download-ggml small.en`.
 
-2. **Install Ollama and models**
+2. **Install Ollama and seed models**
    ```bash
    # https://ollama.ai
    ollama serve &
@@ -49,39 +45,41 @@ DoctorDictate is a macOS desktop app for clinicians who need accurate, private, 
    curl http://localhost:11434/api/tags
    ```
 
-3. **Clone and install packages**
+3. **Clone the repo and install packages**
    ```bash
    git clone <repository-url>
    cd doctor-dictate
-   npm install
+   pnpm install
    ```
+   Dependencies are stored in a shared pnpm content-addressable cache at
+   `~/Library/pnpm/store` to minimize duplicate downloads across projects.
 
 4. **Run the app**
    ```bash
-   npm run dev   # Vite renderer + Electron shell
-   npm start     # Run against the latest build
+   pnpm run dev   # Vite renderer + Electron shell
+   pnpm start     # Run against the latest build
    ```
 
 5. **Build distributables**
    ```bash
-   npm run build
-   npm run dist  # electron-builder packaging
+   pnpm run build
+   pnpm run dist  # electron-builder packaging
    ```
 
 ## Core Scripts
-- `npm run dev` – hot reload for renderer + Electron
-- `npm start` – launch Electron against built assets
-- `npm run build` – build renderer then package with electron-builder
-- `npm run dist` – create installers
-- `npm test`, `npm run test:watch`, `npm run test:coverage` – Jest suites and coverage
-- `npm run lint`, `npm run lint:fix` – ESLint checks
-- `npm run build-prompt` – regenerate static prompt artifacts
-- `RUN_FULL_PIPELINE=true npx jest` – opt-in to full pipeline tests (whisper/ollama integration)
+- `pnpm run dev` – hot reload for renderer + Electron
+- `pnpm start` – launch Electron against built assets
+- `pnpm run build` – build renderer then package with electron-builder
+- `pnpm run dist` – create installers
+- `pnpm test`, `pnpm run test:watch`, `pnpm run test:coverage` – Jest suites and coverage
+- `pnpm run lint`, `pnpm run lint:fix` – ESLint checks
+- `pnpm run build-prompt` – regenerate static prompt artifacts
+- `RUN_FULL_PIPELINE=true pnpm test` – opt-in to full pipeline tests (whisper/ollama integration)
 
 ## Testing & Quality
 - Follow the TDD loop (`Red → Green → Refactor`) for every change
 - Tests target behavior through public APIs using Jest + React Testing Library
-- Maintain coverage with `npm run test:coverage` before submitting changes, and run the prompt/parser/renderer/verifier suites when updating formatting logic
+- Maintain coverage with `pnpm run test:coverage` before submitting changes, and run the prompt/parser/renderer/verifier suites when updating formatting logic
 - Reference `AGENTS.md` for agent workflows and strict TypeScript/immutability rules
 
 ## Project Layout

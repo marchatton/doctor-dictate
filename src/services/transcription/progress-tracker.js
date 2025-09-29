@@ -133,8 +133,6 @@ class TranscriptionProgress {
         }
 
         const stage = this.stages[this.currentStage - 1];
-        const elapsedTotal = (Date.now() - this.overallStartTime) / 1000;
-        
         let message = stage.name;
         let subMessage = '';
 

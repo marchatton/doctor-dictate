@@ -50,7 +50,7 @@ class AudioProcessor {
      * Converts to 16kHz mono WAV to reduce file size and processing time
      */
     async preprocessAudio(inputPath, onProgress) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             const outputPath = path.join(
                 os.tmpdir(), 
                 `preprocessed-${Date.now()}.wav`
@@ -85,7 +85,11 @@ class AudioProcessor {
                     resolve(outputPath);
                 } else {
                     // Fallback: if ffmpeg fails, use original file
-                    console.warn('FFmpeg preprocessing failed, using original file');
+                    if (errorOutput.trim().length > 0) {
+                        console.warn('FFmpeg preprocessing failed, using original file. Details:', errorOutput.trim());
+                    } else {
+                        console.warn('FFmpeg preprocessing failed, using original file');
+                    }
                     resolve(inputPath);
                 }
             });
@@ -246,8 +250,7 @@ class AudioProcessor {
                 // Find overlap point by looking for common words
                 const overlapText = this.findOverlapPoint(
                     combined,
-                    current.text,
-                    current.overlap
+                    current.text
                 );
                 
                 if (overlapText) {
@@ -269,7 +272,7 @@ class AudioProcessor {
     /**
      * Find overlap point between two transcriptions
      */
-    findOverlapPoint(endText, startText, overlapDuration) {
+    findOverlapPoint(endText, startText) {
         // Simple approach: look for common words at boundaries
         const endWords = endText.split(' ').slice(-10); // Last 10 words
         const startWords = startText.split(' ').slice(0, 10); // First 10 words

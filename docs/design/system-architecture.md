@@ -417,9 +417,8 @@ src/
 
 ### Build Process
 ```bash
-npm run build        # Build React app
-npm run build:electron # Build Electron app
-npm run dist        # Package for distribution
+pnpm run build        # Build React app
+pnpm run dist         # Package for distribution
 ```
 
 ### Platform Packages

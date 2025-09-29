@@ -622,11 +622,11 @@ class DictationCommandProcessor {
         const items = [];
         
         // Match patterns like "1) content" or "1. content" or just "content, content"
-        const numberPattern = /(\d+[\)\.])\s*([^0-9\)\.]*)(?=\d+[\)\.]|$)/gi;
+        const numberPattern = /(\d+[).])\s*([^0-9).]*)(?=\d+[).]|$)/gi;
         let match;
         
         while ((match = numberPattern.exec(text)) !== null) {
-            const content = match[2].trim().replace(/[,\.]+$/, ''); // Remove trailing punctuation
+            const content = match[2].trim().replace(/[,.]+$/, ''); // Remove trailing punctuation
             if (content.length > 0) {
                 items.push(content);
             }
@@ -659,7 +659,7 @@ class DictationCommandProcessor {
             /(Current Medications:\s*)(.*?)(?=\n[A-Z]|\n\n|$)/gi,
             (match, header, content) => {
                 // Clean up the content first
-                let cleanContent = content.replace(/[.,]+$/, ''); // Remove trailing punctuation
+                const cleanContent = content.replace(/[.,]+$/, ''); // Remove trailing punctuation
                 
                 // Split by commas but not inside parentheses
                 const parts = cleanContent.split(/,(?![^()]*\))/);

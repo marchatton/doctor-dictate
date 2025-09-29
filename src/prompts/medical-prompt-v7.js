@@ -20,7 +20,7 @@ class MedicalPromptV7 {
     const { manifest } = options;
 
     if (manifest && manifest.entries && manifest.entries.length > 0) {
-      return this.generateStructuredPrompt(dictationText, manifest, options);
+      return this.generateStructuredPrompt(dictationText, manifest);
     }
 
     // No preprocessing - let LLM handle it
@@ -78,7 +78,7 @@ OUTPUT:`;
     return prompt;
   }
 
-  generateStructuredPrompt(dictationText, manifest, options = {}) {
+  generateStructuredPrompt(dictationText, manifest) {
     const manifestLines = manifest.entries.map((entry, index) => {
       const required = entry.templateSection ? entry.templateSection.required : false;
       const origin = entry.type === 'known' ? 'template-section' : 'speaker-defined-section';

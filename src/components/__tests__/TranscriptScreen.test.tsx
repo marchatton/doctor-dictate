@@ -2,6 +2,8 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { TranscriptScreen } from '../TranscriptScreen';
 
+jest.mock('react-markdown', () => (props: { children: React.ReactNode }) => <>{props.children}</>);
+
 describe('TranscriptScreen Component', () => {
   const mockProps = {
     transcript: 'Patient presents with mild anxiety and reports improved sleep patterns.',

@@ -1,7 +1,7 @@
 const { execSync } = require('child_process');
 
 // Run tests and capture output
-const output = execSync('npm test 2>&1', { encoding: 'utf-8' }).toString();
+const output = execSync('pnpm test 2>&1', { encoding: 'utf-8' }).toString();
 
 // Parse failures
 const failurePatterns = {

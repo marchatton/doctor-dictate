@@ -3,7 +3,6 @@
  * Simplified version - trusts LLM and v7 prompt to handle medical formatting properly
  */
 
-const { MedicalPrompt, SectionManifestBuilder } = require('../../prompts');
 const { parseStructuredResponse } = require('./structured-response-parser');
 const { renderStructuredMarkdown } = require('./structured-renderer');
 const { ContentVerifier } = require('./content-verifier');
@@ -22,7 +21,6 @@ class OllamaFormatter {
 
         // Try to load static prompt
         this.staticPrompt = this.loadStaticPrompt();
-        this.manifestBuilder = null;
         this.contentVerifier = new ContentVerifier();
     }
 
@@ -46,7 +44,7 @@ class OllamaFormatter {
             return prompt;
         } catch (error) {
             console.warn('⚠️ Static prompt not found, will use dynamic generation');
-            console.warn('  Run "npm run build-prompt" to generate static prompt');
+            console.warn('  Run "pnpm run build-prompt" to generate static prompt');
             return null;
         }
     }

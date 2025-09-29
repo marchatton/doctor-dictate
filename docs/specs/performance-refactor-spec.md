@@ -680,7 +680,7 @@ async function setupDependencies() {
   
   // 3. Install whisper-node
   console.log('Installing whisper-node...');
-  await execAsync('npm install whisper-node');
+  await execAsync('pnpm add whisper-node');
   
   // 4. Download Whisper models
   console.log('Downloading Whisper models...');

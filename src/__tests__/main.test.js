@@ -33,31 +33,11 @@ jest.mock('path');
 jest.mock('os');
 
 describe('Electron Main Process', () => {
-  let mockMainWindow;
   let ipcHandlers;
 
   beforeEach(() => {
     jest.clearAllMocks();
     
-    // Mock main window
-    mockMainWindow = {
-      loadURL: jest.fn(),
-      loadFile: jest.fn(),
-      show: jest.fn(),
-      on: jest.fn(),
-      once: jest.fn(),
-      webContents: {
-        openDevTools: jest.fn(),
-        send: jest.fn(),
-        setWindowOpenHandler: jest.fn(),
-        session: {
-          webRequest: {
-            onHeadersReceived: jest.fn()
-          }
-        }
-      }
-    };
-
     // Capture IPC handlers for testing
     ipcHandlers = {};
     ipcMain.handle.mockImplementation((channel, handler) => {

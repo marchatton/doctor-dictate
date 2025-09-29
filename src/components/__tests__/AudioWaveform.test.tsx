@@ -2,6 +2,16 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { AudioWaveform } from '../AudioWaveform';
 
+beforeAll(() => {
+  const globalAny = global as any;
+  if (!globalAny.window) {
+    globalAny.window = globalAny;
+  }
+  globalAny.AudioContext = jest.fn();
+  globalAny.window.AudioContext = globalAny.AudioContext;
+  globalAny.window.webkitAudioContext = undefined;
+});
+
 describe('AudioWaveform Component', () => {
   let mockAudioContext: any;
   let mockAnalyser: any;
@@ -14,9 +24,9 @@ describe('AudioWaveform Component', () => {
       fftSize: 64,
       frequencyBinCount: 32,
       smoothingTimeConstant: 0.8,
-      getByteFrequencyData: jest.fn((array) => {
+      getByteTimeDomainData: jest.fn((array: Uint8Array) => {
         for (let i = 0; i < array.length; i++) {
-          array[i] = Math.floor(Math.random() * 255);
+          array[i] = 128 + Math.floor(Math.sin(i) * 20);
         }
       })
     };
@@ -26,16 +36,29 @@ describe('AudioWaveform Component', () => {
       createMediaStreamSource: jest.fn(() => ({
         connect: jest.fn()
       })),
-      close: jest.fn(),
+      close: jest.fn().mockResolvedValue(undefined),
       state: 'running'
     };
 
-    (global.AudioContext as jest.Mock).mockImplementation(() => mockAudioContext);
+    const audioContextMock = (global as any).AudioContext as jest.Mock;
+    audioContextMock.mockClear();
+    audioContextMock.mockImplementation(() => mockAudioContext);
 
     mockStream = {
       getTracks: () => [{
         stop: jest.fn(),
-        kind: 'audio'
+        kind: 'audio',
+        enabled: true,
+        readyState: 'live'
+      }],
+      getAudioTracks: () => [{
+        stop: jest.fn(),
+        id: 'track-1',
+        kind: 'audio',
+        label: 'Mock microphone',
+        enabled: true,
+        muted: false,
+        readyState: 'live'
       }]
     } as any;
   });
@@ -48,12 +71,12 @@ describe('AudioWaveform Component', () => {
 
     it('should not create audio context when inactive', () => {
       render(<AudioWaveform isActive={false} />);
-      expect(global.AudioContext).not.toHaveBeenCalled();
+      expect((global as any).AudioContext).not.toHaveBeenCalled();
     });
 
     it('should create audio context when active with stream', () => {
       render(<AudioWaveform isActive={true} audioStream={mockStream} />);
-      expect(global.AudioContext).toHaveBeenCalled();
+      expect((global as any).AudioContext).toHaveBeenCalled();
     });
 
     it('should render waveform bars when active', async () => {
@@ -115,7 +138,7 @@ describe('AudioWaveform Component', () => {
     it('should not create multiple audio contexts for same stream', () => {
       const { rerender } = render(<AudioWaveform isActive={true} audioStream={mockStream} />);
       rerender(<AudioWaveform isActive={true} audioStream={mockStream} />);
-      expect(global.AudioContext).toHaveBeenCalledTimes(1);
+      expect((global as any).AudioContext).toHaveBeenCalledTimes(1);
     });
   });
 });

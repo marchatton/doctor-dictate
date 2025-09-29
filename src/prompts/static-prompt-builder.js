@@ -3,7 +3,7 @@
 /**
  * Static Prompt Builder
  * Generates a comprehensive static prompt from template files and medical dictionary
- * Run manually: npm run build-prompt
+ * Run manually: pnpm run build-prompt
  */
 
 const fs = require('fs');
@@ -250,6 +250,8 @@ Follow-up
     const corrections = this.buildCorrections(dictionary);
     const sectionRules = this.buildSectionRules(templateJson);
     const example = this.extractExample(exampleMd);
+    const exampleInput = example.input || this.getDefaultInput();
+    const exampleOutput = example.output || this.getDefaultOutput();
 
     // Build complete prompt
     const prompt = `You are a medical note formatter. Convert the raw medical dictation below into a properly formatted clinical note.
@@ -295,20 +297,10 @@ SECTION DETECTION HINTS:
 - "interim history" or "interim" → ### Interim History
 
 EXAMPLE (DO NOT COPY - ONLY FOR FORMAT REFERENCE):
-IF INPUT WAS: "identification john smith fourteen year old male history of adhd chief complaint follow up problem list adhd improving partial control current medications lexapro twenty milligrams daily"
+IF INPUT WAS: "${exampleInput}"
 
 THEN OUTPUT WOULD BE:
-### Identification
-John Smith is a 14 year old male with a history of ADHD.
-
-### CC
-Follow-up
-
-### Problem List
-1. ADHD – improving, partial control
-
-### Current Meds
-1. Lexapro 20mg (daily)
+${exampleOutput}
 
 NOTICE: Only sections mentioned in input are included. No extra diagnoses, medications, or details added.
 
@@ -371,7 +363,7 @@ BEGIN YOUR OUTPUT WITH THE FIRST SECTION HEADER (###):`;
       console.log(`  - Sections defined: ${resources.templateJson.sections.length}`);
       console.log(`  - Corrections loaded: ${Object.keys(resources.dictionary.corrections.medications).length} medications`);
       console.log(`  - Prompt size: ${(prompt.length / 1024).toFixed(1)} KB`);
-      console.log('\n✨ Build complete! Run with: npm run build-prompt');
+      console.log('\n✨ Build complete! Run with: pnpm run build-prompt');
 
     } catch (error) {
       console.error('\n❌ Build failed:', error.message);

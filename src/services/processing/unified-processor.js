@@ -8,7 +8,6 @@ const { WhisperCpp } = require('../transcription/whisper-cpp');
 const { OllamaFormatter } = require('../formatting/ollama-formatter');
 const { WhisperTranscriber } = require('../transcription/whisper');
 const fs = require('fs');
-const path = require('path');
 
 class UnifiedProcessor {
   constructor(mode = 'ACCURATE') {
@@ -81,8 +80,6 @@ class UnifiedProcessor {
       console.log('⚠️ whisper-cli not found, using Python whisper');
       // Fallback to existing Python whisper
       const transcriber = new WhisperTranscriber();
-      const modelName = this.config.whisper.model.replace('.en', ''); // Remove .en suffix for Python
-      
       // Use the transcribeAudio method
       const result = await transcriber.transcribeAudio(audioPath);
       

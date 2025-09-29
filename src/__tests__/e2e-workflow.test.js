@@ -104,13 +104,7 @@ describeE2E('E2E Medical Dictation Workflow', () => {
       const processor = ProcessorFactory.createFast();
       
       // Test with non-existent file
-      try {
-        await processor.process('non-existent-file.m4a');
-        fail('Should have thrown an error');
-      } catch (error) {
-        expect(error).toBeDefined();
-        expect(error.message).toBeTruthy();
-      }
+      await expect(processor.process('non-existent-file.m4a')).rejects.toThrow();
     });
     
     test('should fallback appropriately when services unavailable', async () => {

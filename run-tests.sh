@@ -44,31 +44,31 @@ echo ""
 case "${1:-all}" in
     unit)
         echo "Running unit tests only..."
-        npm test -- --testPathPattern="(processing-config|content-verifier|medical-prompt)" --verbose
+        pnpm test -- --testPathPattern="(processing-config|content-verifier|medical-prompt)" --verbose
         ;;
     integration)
         echo "Running integration tests..."
-        npm test -- --testPathPattern="dual-mode" --verbose
+        pnpm test -- --testPathPattern="dual-mode" --verbose
         ;;
     e2e)
         echo "Running E2E tests..."
-        npm test -- --testPathPattern="e2e-workflow" --verbose
+        pnpm test -- --testPathPattern="e2e-workflow" --verbose
         ;;
     coverage)
         echo "Running tests with coverage..."
-        npm run test:coverage
+        pnpm run test:coverage
         ;;
     watch)
         echo "Starting test watcher..."
-        npm run test:watch
+        pnpm run test:watch
         ;;
     quick)
         echo "Running quick tests (no E2E)..."
-        npm test -- --testPathIgnorePattern="e2e" --verbose
+        pnpm test -- --testPathIgnorePattern="e2e" --verbose
         ;;
     *)
         echo "Running all tests..."
-        npm test -- --verbose
+        pnpm test -- --verbose
         ;;
 esac
 

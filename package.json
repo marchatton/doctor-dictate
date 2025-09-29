@@ -6,12 +6,13 @@
   "directories": {
     "doc": "docs"
   },
+  "packageManager": "pnpm@10.17.1",
   "scripts": {
     "start": "electron .",
-    "dev": "concurrently \"npm run react:dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev": "concurrently \"pnpm run react:dev\" \"wait-on http://localhost:5173 && electron .\"",
     "react:dev": "vite",
     "react:build": "vite build",
-    "build": "npm run react:build && electron-builder",
+    "build": "pnpm run react:build && electron-builder",
     "build:css": "echo 'CSS already built manually'",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",

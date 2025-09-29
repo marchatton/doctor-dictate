@@ -185,7 +185,7 @@ class ContentVerifier {
     /**
      * Generate a detailed report of verification results
      */
-    generateReport(verificationResult, formattedOutput) {
+    generateReport(verificationResult) {
         const report = [];
         
         report.push('\n📊 CONTENT VERIFICATION REPORT');

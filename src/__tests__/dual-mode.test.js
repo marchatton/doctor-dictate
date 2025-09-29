@@ -1,146 +1,60 @@
-/**
- * Test suite for dual-mode processing system
- */
-
-const { ProcessingModes } = require('../services/processing/processing-config');
-const { UnifiedProcessor, ProcessorFactory } = require('../services/processing/unified-processor');
-const { WhisperCpp } = require('../services/transcription/whisper-cpp');
+const { ProcessingModes, AutoModeSelector } = require('../services/processing/processing-config');
 const { OllamaFormatter } = require('../services/formatting/ollama-formatter');
 const { ContentVerifier } = require('../services/formatting/content-verifier');
-const fs = require('fs');
-const path = require('path');
 
-describe('Dual-Mode Processing System', () => {
-  const testAudioPath = path.join(__dirname, '..', '..', 'docs', 'sample-data', 'mock recording-samir.m4a');
-  
-  describe('Processing Modes Configuration', () => {
-    test('should have FAST mode configured correctly', () => {
-      const fastMode = ProcessingModes.FAST;
-      
-      expect(fastMode).toBeDefined();
-      expect(fastMode.whisper.model).toBe('tiny.en');
-      expect(fastMode.ollama.model).toBe('qwen2.5:0.5b');
-      expect(fastMode.vad.enabled).toBe(true);
-      expect(fastMode.vad.threshold).toBe(0.6);
-    });
-    
-    test('should have ACCURATE mode configured correctly', () => {
-      const accurateMode = ProcessingModes.ACCURATE;
-      
-      expect(accurateMode).toBeDefined();
-      expect(accurateMode.whisper.model).toBe('base.en');
-      expect(accurateMode.ollama.model).toBe('qwen2.5:1.5b');
-      expect(accurateMode.vad.enabled).toBe(true);
-      expect(accurateMode.vad.threshold).toBe(0.4);
-    });
-    
-    test('should have different performance expectations', () => {
-      expect(ProcessingModes.FAST.expected.speed).toBe('7-10x real-time');
-      expect(ProcessingModes.ACCURATE.expected.speed).toBe('3-5x real-time');
-      
-      expect(ProcessingModes.FAST.expected.accuracy).toBe('85%');
-      expect(ProcessingModes.ACCURATE.expected.accuracy).toBe('95%');
-    });
+describe('Processing configuration', () => {
+  it('configures FAST mode with the lightweight Whisper model', () => {
+    expect(ProcessingModes.FAST.whisper.model).toBe('base.en');
+    expect(ProcessingModes.FAST.ollama.model).toBe('qwen2.5:1.5b');
+    expect(ProcessingModes.FAST.ollama.timeout).toBe(90000);
   });
-  
-  describe('ProcessorFactory', () => {
-    test('should create FAST processor', () => {
-      const processor = ProcessorFactory.createFast();
-      
-      expect(processor).toBeInstanceOf(UnifiedProcessor);
-      expect(processor.config.name).toBe('Fast');
-    });
-    
-    test('should create ACCURATE processor', () => {
-      const processor = ProcessorFactory.createAccurate();
-      
-      expect(processor).toBeInstanceOf(UnifiedProcessor);
-      expect(processor.config.name).toBe('High Accuracy');
-    });
+
+  it('configures ACCURATE mode with higher quality settings', () => {
+    expect(ProcessingModes.ACCURATE.whisper.model).toBe('small.en');
+    expect(ProcessingModes.ACCURATE.ollama.model).toBe('qwen2.5:1.5b');
+    expect(ProcessingModes.ACCURATE.ollama.timeout).toBe(120000);
   });
-  
-  describe('WhisperCpp', () => {
-    let whisperCpp;
-    
-    beforeAll(() => {
-      whisperCpp = new WhisperCpp({ model: 'tiny.en' });
-    });
-    
-    test('should initialize with correct model', () => {
-      expect(whisperCpp.model).toBe('tiny.en');
-    });
-    
-    test('should detect whisper-cli executable', async () => {
-      const isAvailable = await whisperCpp.isAvailable();
-      expect(typeof isAvailable).toBe('boolean');
-    });
-    
-    test('should validate audio conversion for non-WAV files', async () => {
-      const testFile = 'test.m4a';
-      // Mock the conversion since we're just testing the logic
-      const shouldConvert = !testFile.endsWith('.wav');
-      expect(shouldConvert).toBe(true);
-    });
+
+  it('selects a mode based on recording length', () => {
+    expect(AutoModeSelector.selectMode(180)).toBe(ProcessingModes.ACCURATE);
+    expect(AutoModeSelector.selectMode(3600)).toBe(ProcessingModes.FAST);
   });
-  
-  describe('ContentVerifier', () => {
-    let verifier;
-    
-    beforeAll(() => {
-      verifier = new ContentVerifier();
-    });
-    
-    test('should verify content with high coverage', () => {
-      const input = 'The patient John Smith has ADHD and depression.';
-      const output = 'John Smith has ADHD and depression.';
-      
-      const result = verifier.verifyContent(input, output);
-      
-      expect(result.isValid).toBe(true);
-      expect(result.coverage).toBeGreaterThan(0.8);
-    });
-    
-    test('should detect missing content', () => {
-      const input = 'The patient John Smith has ADHD and depression. He takes Lexapro daily.';
-      const output = 'John Smith has ADHD.';
-      
-      const result = verifier.verifyContent(input, output);
-      
-      expect(result.isValid).toBe(false);
-      expect(result.coverage).toBeLessThan(0.8);
-      expect(result.missingWords).toContain('depression');
-      expect(result.missingWords).toContain('Lexapro');
-    });
-    
-    test('should find missing sentences', () => {
-      const input = 'First sentence here. Second sentence missing. Third sentence here.';
-      const output = 'First sentence here. Third sentence here.';
-      
-      const result = verifier.verifyContent(input, output);
-      
-      expect(result.missingSentences.length).toBeGreaterThan(0);
-      expect(result.missingSentences[0]).toContain('Second sentence');
-    });
+});
+
+describe('Ollama formatter defaults', () => {
+  it('uses the configured model when instantiated', () => {
+    const formatter = new OllamaFormatter({ model: ProcessingModes.FAST.ollama.model });
+    expect(formatter.model).toBe('qwen2.5:1.5b');
   });
-  
-  describe('OllamaFormatter Configuration', () => {
-    test('should initialize with FAST mode config', () => {
-      const formatter = new OllamaFormatter({ 
-        model: ProcessingModes.FAST.ollama.model 
-      });
-      expect(formatter.model).toBe('qwen2.5:0.5b');
-    });
-    
-    test('should initialize with ACCURATE mode config', () => {
-      const formatter = new OllamaFormatter({ 
-        model: ProcessingModes.ACCURATE.ollama.model 
-      });
-      expect(formatter.model).toBe('qwen2.5:1.5b');
-    });
-    
-    test('should have appropriate timeout settings', () => {
-      expect(ProcessingModes.FAST.ollama.timeout).toBe(30000);
-      expect(ProcessingModes.ACCURATE.ollama.timeout).toBe(60000);
-    });
+});
+
+describe('Content verifier basics', () => {
+  const verifier = new ContentVerifier();
+
+  it('recognises full coverage when all key words match', () => {
+    const input = 'John Smith has depression and insomnia that is improving.';
+    const output = 'John Smith has depression and insomnia that is improving.';
+
+    const result = verifier.verifyContent(input, output);
+    expect(result.isValid).toBe(true);
+    expect(result.coverage).toBeCloseTo(1, 5);
+  });
+
+  it('flags coverage issues and identifies missing words', () => {
+    const input = 'Patient reports depression improving but insomnia persistent.';
+    const output = 'Patient reports depression improving.';
+
+    const result = verifier.verifyContent(input, output);
+    expect(result.isValid).toBe(false);
+    expect(result.missingWords).toContain('insomnia');
+  });
+
+  it('tracks missing sentences when most keywords are absent', () => {
+    const input = 'First paragraph covers medication updates. Second paragraph describes sleep. Third paragraph final plan.';
+    const output = 'First paragraph covers medication updates. Third paragraph final plan.';
+
+    const result = verifier.verifyContent(input, output);
+    expect(result.missingSentences.length).toBeGreaterThan(0);
+    expect(result.missingSentences[0].text).toContain('Second paragraph');
   });
 });

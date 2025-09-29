@@ -202,9 +202,9 @@ After careful review and testing:
 ## Testing Strategy
 
 After each phase:
-1. Run `npm test` to ensure nothing breaks
-2. Run `npm run dev` to test application
-3. Run `npm run lint` to check for issues
+1. Run `pnpm test` to ensure nothing breaks
+2. Run `pnpm run dev` to test application
+3. Run `pnpm run lint` to check for issues
 4. Commit changes with clear message
 
 ## Risk Mitigation

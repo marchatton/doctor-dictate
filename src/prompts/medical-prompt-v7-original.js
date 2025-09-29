@@ -5,7 +5,6 @@
  */
 
 const { SectionDetector } = require('./section-detector');
-const { dictationCommands } = require('../data/dictation-commands');
 const { dosingPatterns } = require('../data/dosing-patterns');
 const medicalDictionary = require('../data/medical-dictionary');
 

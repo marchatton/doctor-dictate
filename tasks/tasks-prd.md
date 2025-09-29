@@ -13,7 +13,7 @@
 ### Notes
 
 - Unit tests should typically be placed alongside the code files they are testing
-- Use `npm test` to run tests once Jest is configured
+- Use `pnpm test` to run tests once Jest is configured
 - Whisper models will be downloaded locally and processed via Node.js child processes
 
 ## Tasks

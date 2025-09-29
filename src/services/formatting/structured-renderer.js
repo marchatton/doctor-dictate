@@ -1,4 +1,3 @@
-const DEFAULT_HEADER_PREFIX = '###';
 const { normalizeSectionBody } = require('./structured-normalizer');
 
 function getHeaderPrefix(template) {

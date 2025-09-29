@@ -2,7 +2,7 @@
 
 /**
  * Generate Mermaid diagrams as images
- * Requires: npm install -g @mermaid-js/mermaid-cli
+ * Requires: pnpm add -g @mermaid-js/mermaid-cli
  */
 
 const fs = require('fs');
@@ -40,7 +40,7 @@ while ((match = mermaidRegex.exec(content)) !== null) {
 
 console.log(`\nExtracted ${diagramIndex} Mermaid diagrams to ${outputDir}`);
 console.log('\nTo generate images, run:');
-console.log('npm install -g @mermaid-js/mermaid-cli');
+console.log('pnpm add -g @mermaid-js/mermaid-cli');
 console.log(`mmdc -i ${outputDir}/diagram-1.mmd -o ${outputDir}/architecture-overview.png`);
 console.log(`mmdc -i ${outputDir}/diagram-2.mmd -o ${outputDir}/processing-pipeline.png`);
 console.log(`mmdc -i ${outputDir}/diagram-3.mmd -o ${outputDir}/component-architecture.png`);
@@ -49,5 +49,4 @@ console.log(`mmdc -i ${outputDir}/diagram-5.mmd -o ${outputDir}/prompt-system.pn
 console.log(`mmdc -i ${outputDir}/diagram-6.mmd -o ${outputDir}/data-flow.png`);
 console.log(`mmdc -i ${outputDir}/diagram-7.mmd -o ${outputDir}/prompt-generation.png`);
 console.log(`mmdc -i ${outputDir}/diagram-8.mmd -o ${outputDir}/error-handling.png`);
-
 
