@@ -6,6 +6,7 @@
 const { MedicalPrompt, SectionManifestBuilder } = require('../../prompts');
 const { parseStructuredResponse } = require('./structured-response-parser');
 const { renderStructuredMarkdown } = require('./structured-renderer');
+const { ContentVerifier } = require('./content-verifier');
 const fs = require('fs');
 const path = require('path');
 
@@ -22,6 +23,7 @@ class OllamaFormatter {
         // Try to load static prompt
         this.staticPrompt = this.loadStaticPrompt();
         this.manifestBuilder = null;
+        this.contentVerifier = new ContentVerifier();
     }
 
     /**
@@ -305,7 +307,7 @@ class OllamaFormatter {
 
         console.log(`🔍 Model: ${this.model}, Temperature: ${this.temperature}`);
         console.log('📝 PROMPT LENGTH:', prompt.length, 'characters');
-        
+
         try {
             const formattedText = await this.generateCompletion(prompt, {
                 temperature: this.temperature,
@@ -324,10 +326,11 @@ class OllamaFormatter {
                     model: this.model
                 };
             }
-            
+
             if (useStructuredPipeline) {
+                console.log('🧭 Structured manifest sections:', manifest.entries.map((entry) => entry.title || entry.detectedTitle || entry.key).join(', '));
                 const template = await this.getTemplate();
-                return this.handleStructuredResponse(formattedText, messyText, manifest, promptVersion, template);
+                return this.handleStructuredResponse(formattedText, messyText, manifest, promptVersion, template, options);
             }
 
             const cleanedText = this.postProcessResponse(formattedText);
@@ -359,14 +362,35 @@ class OllamaFormatter {
         }
     }
 
-    handleStructuredResponse(responseText, originalText, manifest, promptVersion, template) {
+    handleStructuredResponse(responseText, originalText, manifest, promptVersion, template, options = {}) {
         try {
             const parsed = parseStructuredResponse(responseText, manifest);
             const rendered = renderStructuredMarkdown(parsed, manifest, template);
+            const verification = this.contentVerifier.verifyStructuredNote({
+                dictationText: options.dictationText || originalText,
+                manifest,
+                markdown: rendered,
+                structured: parsed
+            });
+
+            if (!verification.isValid) {
+                console.warn('⚠️ Structured verification issues detected:', {
+                    missingSections: verification.missingSections,
+                    extraSections: verification.extraSections,
+                    coverageIssues: verification.coverageIssues.map((issue) => ({
+                        key: issue.key,
+                        coverage: issue.coverage
+                    }))
+                });
+            } else {
+                console.log('✅ Structured verification passed with sections:', manifest.entries.length);
+            }
+
             return {
                 success: true,
                 formatted: rendered,
                 structured: parsed,
+                verification,
                 model: this.model,
                 promptVersion,
                 manifest

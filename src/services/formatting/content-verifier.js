@@ -7,7 +7,6 @@ class ContentVerifier {
     constructor() {
         this.minWordLength = 5;  // Ignore small words like "a", "the", "is"
         this.minCoverage = 0.8;   // Require 80% of significant words
-        this.contextWindow = 10;  // Words around missing content for context
     }
 
     /**
@@ -181,125 +180,6 @@ class ContentVerifier {
             return words.slice(start, start + 3).join(' ');
         }
         return null;
-    }
-
-    /**
-     * Attempt to reinject missing sentences into formatted output
-     */
-    reinjectMissingContent(formattedOutput, missingSentences, originalInput) {
-        if (!missingSentences || missingSentences.length === 0) {
-            return formattedOutput;
-        }
-        
-        console.log(`\n⚠️ Attempting to reinject ${missingSentences.length} missing sentences...`);
-        
-        let enhanced = formattedOutput;
-        
-        for (const missing of missingSentences) {
-            // Find the best section to inject the missing content
-            const section = this.findBestSection(missing.text, originalInput, enhanced);
-            
-            if (section) {
-                console.log(`  → Injecting into ${section.name} section`);
-                enhanced = this.injectIntoSection(enhanced, section, missing.text);
-            } else {
-                console.log(`  → Could not find appropriate section for: "${missing.text.substring(0, 50)}..."`);
-            }
-        }
-        
-        return enhanced;
-    }
-
-    /**
-     * Determine which section missing content belongs to
-     */
-    findBestSection(missingText, originalInput, formattedOutput) {
-        const lowerText = missingText.toLowerCase();
-        
-        // Section indicators
-        const sectionMap = {
-            'Risk Assessment': ['suicide', 'risk', 'firearms', 'harm', 'safety', 'supportive family'],
-            'MSE': ['mental status', 'oriented', 'mood', 'affect', 'thought'],
-            'Interim History': ['interim', 'symptoms', 'medications', 'tolerating'],
-            'Past Medical History': ['past', 'prior', 'history', 'previous'],
-            'Plan': ['continue', 'start', 'follow up', 'psychoeducation'],
-            'Assessment': ['diagnosis', 'stable', 'control'],
-            'Current Meds': ['mg', 'daily', 'QHS', 'BID', 'TID']
-        };
-        
-        // Score each section based on keyword matches
-        let bestSection = null;
-        let bestScore = 0;
-        
-        for (const [sectionName, keywords] of Object.entries(sectionMap)) {
-            const score = keywords.filter(kw => lowerText.includes(kw)).length;
-            if (score > bestScore) {
-                bestScore = score;
-                bestSection = sectionName;
-            }
-        }
-        
-        // Find section in formatted output
-        if (bestSection) {
-            const sectionRegex = new RegExp(`### ${bestSection}\\b`, 'i');
-            const sectionMatch = formattedOutput.match(sectionRegex);
-            if (sectionMatch) {
-                return {
-                    name: bestSection,
-                    position: sectionMatch.index
-                };
-            }
-        }
-        
-        return null;
-    }
-
-    /**
-     * Inject missing text into the appropriate section
-     */
-    injectIntoSection(formattedOutput, section, missingText) {
-        // Find the end of the section (next ### or end of document)
-        const nextSectionRegex = /\n### /g;
-        nextSectionRegex.lastIndex = section.position + 1;
-        const nextSection = nextSectionRegex.exec(formattedOutput);
-        
-        const sectionEnd = nextSection ? nextSection.index : formattedOutput.length;
-        
-        // Clean up the missing text
-        const cleanedText = this.cleanDictationText(missingText);
-        
-        // Inject before the end of section
-        const before = formattedOutput.substring(0, sectionEnd);
-        const after = formattedOutput.substring(sectionEnd);
-        
-        // Add as a bullet point if section uses bullets, otherwise as a sentence
-        const sectionContent = formattedOutput.substring(section.position, sectionEnd);
-        const separator = sectionContent.includes('\n- ') ? '\n- ' : '. ';
-        
-        return before + separator + cleanedText + after;
-    }
-
-    /**
-     * Clean dictation artifacts from text
-     */
-    cleanDictationText(text) {
-        let cleaned = text;
-        
-        // Remove dictation commands
-        cleaned = cleaned.replace(/\b(period|comma|colon|next line|next paragraph)\b\.?/gi, '');
-        
-        // Fix spacing
-        cleaned = cleaned.replace(/\s+/g, ' ').trim();
-        
-        // Capitalize first letter
-        cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-        
-        // Ensure ends with period
-        if (!cleaned.match(/[.!?]$/)) {
-            cleaned += '.';
-        }
-        
-        return cleaned;
     }
 
     /**
