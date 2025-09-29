@@ -68,7 +68,7 @@
       "required": false,
       "format": "paragraph",
       "patterns": ["^past medical", "^pmh", "^past history"],
-      "default": "No changes.",
+      "autoFill": false,
       "description": "Past medical history updates"
     },
     {
@@ -77,7 +77,7 @@
       "required": false,
       "format": "paragraph",
       "patterns": ["^social history", "^social"],
-      "default": "See HPI.",
+      "autoFill": false,
       "description": "Social history updates"
     },
     {
@@ -86,7 +86,7 @@
       "required": false,
       "format": "paragraph",
       "patterns": ["^family history", "^family"],
-      "default": "No changes. No knowledge of maternal/paternal family hx of sudden cardiac death/unexplained death or cardiac issues in relatives under age 50.",
+      "autoFill": false,
       "description": "Family history updates"
     },
     {
@@ -96,12 +96,7 @@
       "format": "bullet-list",
       "patterns": ["^ros", "^review of systems"],
       "description": "Review of systems",
-      "default": [
-        "General: Denies weight changes",
-        "CVS: No CP or palpitations",
-        "CNS: No dizziness, lightheadedness, falls, or LOC",
-        "ROS negative except as noted above"
-      ]
+      "autoFill": false
     },
     {
       "id": "vitals",
@@ -146,9 +141,7 @@
       "format": "bullet-list",
       "patterns": ["^plan", "^treatment plan"],
       "description": "Treatment plan",
-      "default": [
-        "Discussed diagnoses, clinical impressions, and treatment recommendations"
-      ]
+      "autoFill": false
     },
     {
       "id": "therapy-notes",
@@ -156,7 +149,7 @@
       "required": false,
       "format": "paragraph",
       "patterns": ["^therapy notes", "^therapy"],
-      "default": "N/a",
+      "autoFill": false,
       "description": "Additional therapy notes"
     }
   ],
