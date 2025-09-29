@@ -11,6 +11,68 @@ class ContentVerifier {
     }
 
     /**
+     * Verify structured manifest outputs against the rendered markdown.
+     * Ensures each manifest section appears, unexpected sections are flagged,
+     * and key phrases survive within each section body.
+     */
+    verifyStructuredNote({ dictationText = '', manifest = { entries: [] }, markdown = '', structured = {} }) {
+        const report = {
+            isValid: true,
+            missingSections: [],
+            extraSections: [],
+            coverageIssues: [],
+            sectionCoverages: []
+        };
+
+        const headings = this.extractHeadings(markdown);
+        const manifestEntries = manifest.entries || [];
+        const manifestTitles = manifestEntries.map((entry) => (entry.title || entry.detectedTitle || entry.key || '').trim());
+        const manifestTitleSet = new Set(manifestTitles.map((title) => title.toLowerCase()));
+
+        manifestEntries.forEach((entry) => {
+            const title = (entry.title || entry.detectedTitle || entry.key || '').trim();
+            const headingPresent = headings.some((heading) => heading.toLowerCase() === title.toLowerCase());
+            if (!headingPresent) {
+                report.isValid = false;
+                report.missingSections.push(title);
+            }
+
+            const snippet = this.extractManifestSnippet(dictationText, entry);
+            const structuredSection = (structured.sections || []).find((section) => section.key === entry.key);
+            const sectionBody = structuredSection?.body || '';
+            if (snippet && sectionBody) {
+                const coverageResult = this.verifyContent(snippet, sectionBody);
+                report.sectionCoverages.push({
+                    key: entry.key,
+                    title,
+                    coverage: coverageResult.coverage,
+                    details: coverageResult
+                });
+
+                if (!coverageResult.isValid) {
+                    report.isValid = false;
+                    report.coverageIssues.push({
+                        key: entry.key,
+                        title,
+                        coverage: coverageResult.coverage,
+                        missingSentences: coverageResult.missingSentences
+                    });
+                }
+            }
+        });
+
+        headings.forEach((heading) => {
+            const lower = heading.toLowerCase();
+            if (!manifestTitleSet.has(lower) && lower !== 'uncategorized') {
+                report.isValid = false;
+                report.extraSections.push(heading);
+            }
+        });
+
+        return report;
+    }
+
+    /**
      * Check if formatted output contains sufficient content from input
      * @returns {Object} { isValid, coverage, missingWords, missingSentences }
      */
@@ -276,6 +338,37 @@ class ContentVerifier {
         }
         
         return report.join('\n');
+    }
+
+    extractHeadings(markdown) {
+        const headings = [];
+        const regex = /^#+\s+(.+)$/gm;
+        let match;
+        while ((match = regex.exec(markdown)) !== null) {
+            const title = match[1].trim();
+            if (title) headings.push(title);
+        }
+        return headings;
+    }
+
+    extractManifestSnippet(dictationText, entry) {
+        if (!dictationText) return '';
+        const range = entry.contentRange || {};
+        const { start, end } = range;
+
+        if (typeof start === 'number' && typeof end === 'number' && end > start) {
+            return dictationText.slice(start, end);
+        }
+
+        const fallbackTitle = (entry.title || entry.detectedTitle || '').trim();
+        if (!fallbackTitle) return '';
+
+        const idx = dictationText.toLowerCase().indexOf(fallbackTitle.toLowerCase());
+        if (idx === -1) return '';
+
+        const snippetStart = idx + fallbackTitle.length;
+        const snippetEnd = Math.min(dictationText.length, snippetStart + 400);
+        return dictationText.slice(snippetStart, snippetEnd);
     }
 }
 
