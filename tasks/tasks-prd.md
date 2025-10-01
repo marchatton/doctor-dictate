@@ -13,7 +13,7 @@
 ### Notes
 
 - Unit tests should typically be placed alongside the code files they are testing
-- Use `pnpm test` to run tests once Jest is configured
+- Use `npm test` to run tests once Jest is configured
 - Whisper models will be downloaded locally and processed via Node.js child processes
 
 ## Tasks
@@ -55,7 +55,7 @@
   - [ ] 3.5 Test with 2-3 friendly psychiatrists (including mock file)
   - [ ] 3.6 Collect feedback on accuracy and usability
   - [ ] 3.7 Implement critical bug fixes based on testing
-
+a
 - [ ] 4.0 Phase 3: V1 Development - Encryption and Templates
   - [ ] 4.1 Implement password protection on app launch
   - [ ] 4.2 Add encryption for stored audio and transcript files
