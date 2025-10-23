@@ -1,6 +1,6 @@
 # CLAUDE.md (DoctorDictate)
 
-**Purpose:** Guardrails for Claude Code within DoctorDictate. Emphasise local-only processing, strict TypeScript, and test-first changes. Defaults: **pnpm**, Electron main + React renderer, Jest, Tailwind.
+**Purpose:** Guardrails for Claude Code within DoctorDictate. Emphasise local-only processing, strict TypeScript, and test-first changes. Defaults: **pnpm**, Electron main + React renderer, Jest, Tailwind. In all interactions and comment messages, be extremely concise and sacrifice grammar for the sake of concision.
 
 **Claude-critical overlays:**
 - Start by reading relevant files, then outline a plan before editing or running commands.

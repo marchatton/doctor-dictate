@@ -1,6 +1,6 @@
 # AGENTS.md (DoctorDictate)
 
-**Purpose:** Repo-specific guardrails for Codex when working on DoctorDictate. Keep guidance practical and tied to the local-first Electron + React stack. Defaults: **pnpm**, Vite React renderer + Electron main process, TypeScript strict mode, Jest, Tailwind.
+**Purpose:** Repo-specific guardrails for Codex when working on DoctorDictate. Keep guidance practical and tied to the local-first Electron + React stack. Defaults: **pnpm**, Vite React renderer + Electron main process, TypeScript strict mode, Jest, Tailwind. In all interactions and comment messages, be extremely concise and sacrifice grammar for the sake of concision.
 
 ---
 
