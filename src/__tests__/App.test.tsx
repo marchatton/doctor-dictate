@@ -43,34 +43,45 @@ describe('App Component', () => {
     jest.clearAllMocks();
   });
 
+  const renderApp = async () => {
+    const utils = render(<App />);
+    await waitFor(() => {
+      expect(window.electronAPI.listTranscriptionModes).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('recording-screen')).toBeInTheDocument();
+    });
+    return utils;
+  };
+
   describe('Initial State', () => {
-    it('should render recording screen by default', () => {
-      render(<App />);
+    it('should render recording screen by default', async () => {
+      await renderApp();
       expect(screen.getByTestId('recording-screen')).toBeInTheDocument();
     });
 
-    it('should render header', () => {
-      render(<App />);
+    it('should render header', async () => {
+      await renderApp();
       expect(screen.getByText('Doctor Dictate')).toBeInTheDocument();
       expect(screen.getByText('Accurate clinical note transcription')).toBeInTheDocument();
     });
 
-    it('should render footer', () => {
-      render(<App />);
+    it('should render footer', async () => {
+      await renderApp();
       expect(screen.getByText('Your notes never leave your laptop • Built with privacy in mind')).toBeInTheDocument();
     });
 
-    it('should have proper layout structure', () => {
-      const { container } = render(<App />);
-      
+    it('should have proper layout structure', async () => {
+      const { container } = await renderApp();
+
       // Check for main layout classes
       expect(container.querySelector('.min-h-screen')).toBeInTheDocument();
       expect(container.querySelector('.flex-1')).toBeInTheDocument();
     });
 
-    it('should have background pattern', () => {
-      const { container } = render(<App />);
-      
+    it('should have background pattern', async () => {
+      const { container } = await renderApp();
+
       const mainContainer = container.querySelector('.min-h-screen');
       expect(mainContainer).toHaveStyle({
         backgroundSize: '30px'
@@ -80,8 +91,8 @@ describe('App Component', () => {
 
   describe('Recording Flow', () => {
     it('should transition from recording to processing when recording starts and stops', async () => {
-      render(<App />);
-      
+      await renderApp();
+
       // Start recording
       const startButton = screen.getByText('Start Recording');
       fireEvent.click(startButton);
@@ -97,8 +108,8 @@ describe('App Component', () => {
     });
 
     it('should transition from processing to transcript when complete', async () => {
-      render(<App />);
-      
+      await renderApp();
+
       // Trigger complete processing flow
       const completeButton = screen.getByText('Complete Processing');
       fireEvent.click(completeButton);
@@ -110,8 +121,8 @@ describe('App Component', () => {
     });
 
     it('should show transcript content after processing', async () => {
-      render(<App />);
-      
+      await renderApp();
+
       const completeButton = screen.getByText('Complete Processing');
       fireEvent.click(completeButton);
       
@@ -123,8 +134,8 @@ describe('App Component', () => {
 
   describe('State Management', () => {
     it('should update recording time', async () => {
-      render(<App />);
-      
+      await renderApp();
+
       // Start recording to activate timer
       const startButton = screen.getByText('Start Recording');
       fireEvent.click(startButton);
@@ -133,16 +144,16 @@ describe('App Component', () => {
       expect(screen.getByTestId('recording-screen')).toBeInTheDocument();
     });
 
-    it('should handle accuracy toggle changes', () => {
-      render(<App />);
-      
+    it('should handle accuracy toggle changes', async () => {
+      await renderApp();
+
       // Recording screen should be rendered with default high accuracy
       expect(screen.getByTestId('recording-screen')).toBeInTheDocument();
     });
 
     it('should reset state when starting new recording', async () => {
-      render(<App />);
-      
+      await renderApp();
+
       // Complete a recording first
       const completeButton = screen.getByText('Complete Processing');
       fireEvent.click(completeButton);
@@ -162,8 +173,8 @@ describe('App Component', () => {
 
   describe('Processing State Management', () => {
     it('should show processing screen after recording', async () => {
-      render(<App />);
-      
+      await renderApp();
+
       // Start and stop recording to enter processing
       fireEvent.click(screen.getByText('Start Recording'));
       fireEvent.click(screen.getByText('Stop Recording'));
@@ -176,7 +187,7 @@ describe('App Component', () => {
 
   describe('Patient Data', () => {
     it('should have default patient name', async () => {
-      render(<App />);
+      await renderApp();
       
       // Complete recording to see transcript screen
       const completeButton = screen.getByText('Complete Processing');
@@ -193,15 +204,15 @@ describe('App Component', () => {
 
   describe('Screen Transitions', () => {
     it('should have smooth transitions between screens', async () => {
-      const { container } = render(<App />);
-      
+      const { container } = await renderApp();
+
       // Check for transition classes
       const mainContent = container.querySelector('.transition-all');
       expect(mainContent).toHaveClass('duration-500', 'ease-in-out');
     });
 
     it('should maintain layout consistency across screens', async () => {
-      const { container } = render(<App />);
+      const { container } = await renderApp();
       
       // Recording screen
       expect(screen.getByTestId('recording-screen')).toBeInTheDocument();
@@ -223,7 +234,7 @@ describe('App Component', () => {
 
   describe('Error Handling', () => {
     it('should handle transcript completion with empty transcript', async () => {
-      render(<App />);
+      await renderApp();
       
       // Mock empty transcript
       const recordingScreen = screen.getByTestId('recording-screen');
@@ -237,8 +248,8 @@ describe('App Component', () => {
       });
     });
 
-    it('should maintain responsive layout on different screen sizes', () => {
-      const { container } = render(<App />);
+    it('should maintain responsive layout on different screen sizes', async () => {
+      const { container } = await renderApp();
       
       // Check for responsive classes
       expect(container.querySelector('.p-4')).toBeInTheDocument();
@@ -248,23 +259,23 @@ describe('App Component', () => {
   });
 
   describe('Accessibility', () => {
-    it('should have proper semantic structure', () => {
-      render(<App />);
+    it('should have proper semantic structure', async () => {
+      await renderApp();
       
       expect(screen.getByRole('main')).toBeInTheDocument();
       expect(screen.getByRole('contentinfo')).toBeInTheDocument(); // footer
     });
 
-    it('should have proper heading hierarchy', () => {
-      render(<App />);
+    it('should have proper heading hierarchy', async () => {
+      await renderApp();
       
       const mainHeading = screen.getByRole('heading', { level: 1 });
       expect(mainHeading).toBeInTheDocument();
       expect(mainHeading).toHaveTextContent('Doctor Dictate');
     });
 
-    it('should provide meaningful text content', () => {
-      render(<App />);
+    it('should provide meaningful text content', async () => {
+      await renderApp();
       
       expect(screen.getByText('Accurate clinical note transcription')).toBeInTheDocument();
       expect(screen.getByText('Your notes never leave your laptop • Built with privacy in mind')).toBeInTheDocument();
@@ -273,7 +284,7 @@ describe('App Component', () => {
 
   describe('Performance', () => {
     it('should not cause memory leaks with state updates', async () => {
-      const { unmount } = render(<App />);
+      const { unmount } = await renderApp();
       
       // Trigger some state changes
       fireEvent.click(screen.getByText('Start Recording'));
@@ -286,7 +297,7 @@ describe('App Component', () => {
     });
 
     it('should handle rapid state changes gracefully', async () => {
-      render(<App />);
+      await renderApp();
       
       // Rapidly trigger state changes
       const startButton = screen.getByText('Start Recording');

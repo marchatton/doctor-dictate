@@ -288,7 +288,9 @@ export function AudioWaveform({
           
           if (sourceRef.current) {
             console.log(`[Waveform-${instanceIdRef.current}] Disconnecting source in cleanup`);
-            sourceRef.current.disconnect();
+            if (typeof sourceRef.current.disconnect === 'function') {
+              sourceRef.current.disconnect();
+            }
             sourceRef.current = undefined;
           }
           
@@ -311,7 +313,9 @@ export function AudioWaveform({
       // Clean up audio resources
       if (sourceRef.current) {
         console.log(`[Waveform-${instanceIdRef.current}] Disconnecting source (not recording)`);
-        sourceRef.current.disconnect();
+        if (typeof sourceRef.current.disconnect === 'function') {
+          sourceRef.current.disconnect();
+        }
         sourceRef.current = undefined;
       }
       

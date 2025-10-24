@@ -20,13 +20,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Whisper transcription
   initializeWhisper: () => ipcRenderer.invoke('initialize-whisper'),
   validateWhisper: () => ipcRenderer.invoke('validate-whisper'),
-  transcribeAudio: (audioFilePath) => ipcRenderer.invoke('transcribe-audio', audioFilePath),
+  transcribeAudio: (request) => ipcRenderer.invoke('transcribe-audio', request),
+  listTranscriptionModes: () => ipcRenderer.invoke('list-transcription-modes'),
   getConfidenceScore: (data) => ipcRenderer.invoke('get-confidence-score', data),
   resetTranscriptionState: () => ipcRenderer.invoke('reset-transcription-state'),
+  formatTranscript: (payload) => ipcRenderer.invoke('format-transcript', payload),
+  saveFormattedNote: (data) => ipcRenderer.invoke('save-formatted-note', data),
   
   // Model selection
   getWhisperModels: () => ipcRenderer.invoke('get-whisper-models'),
   setWhisperModel: (model) => ipcRenderer.invoke('set-whisper-model', model),
+  validateModelAssets: () => ipcRenderer.invoke('validate-model-assets'),
+  downloadModelAssets: (options) => ipcRenderer.invoke('download-model-assets', options),
   
   // Listen for transcription progress updates
   onTranscriptionProgress: (callback) => {

@@ -196,11 +196,11 @@ class SectionDetector {
     const sections = [];
     const lines = text.split('\n');
     let currentPos = 0;
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const detection = this.detectSection(text, currentPos);
-      
+
       if (detection && detection.confidence > 0.8) {
         sections.push({
           ...detection,
@@ -209,11 +209,55 @@ class SectionDetector {
           lineText: line
         });
       }
-      
+
       currentPos += line.length + 1; // +1 for newline
     }
-    
+
+    const seen = new Set(sections.map((section) => `${section.title}-${section.position}`));
+    for (const position of this.collectCandidatePositions(text)) {
+      const detection = this.detectSection(text, position);
+      if (!detection || detection.confidence <= 0.8) {
+        continue;
+      }
+
+      const key = `${detection.title}-${position}`;
+      if (seen.has(key)) {
+        continue;
+      }
+
+      sections.push({
+        ...detection,
+        position,
+        lineNumber: this.getLineNumber(text, position),
+        lineText: this.extractLine(text, position),
+      });
+      seen.add(key);
+    }
+
     return sections;
+  }
+
+  collectCandidatePositions(text) {
+    const positions = [];
+    const regex = /[^.!?\n]+[.!?\n]/g;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      positions.push(match.index);
+    }
+    if (positions.length === 0) {
+      positions.push(0);
+    }
+    return positions;
+  }
+
+  getLineNumber(text, index) {
+    return text.slice(0, index).split('\n').length;
+  }
+
+  extractLine(text, index) {
+    const start = text.lastIndexOf('\n', index) + 1;
+    const end = text.indexOf('\n', index);
+    return text.slice(start, end === -1 ? text.length : end).trim();
   }
 }
 

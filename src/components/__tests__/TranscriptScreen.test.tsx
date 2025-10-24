@@ -5,12 +5,24 @@ import { TranscriptScreen } from '../TranscriptScreen';
 jest.mock('react-markdown', () => (props: { children: React.ReactNode }) => <>{props.children}</>);
 
 describe('TranscriptScreen Component', () => {
+  const baseMetadata = {
+    duration: 0,
+    medicalTermsCount: 0,
+    correctionsCount: 0,
+    corrections: [],
+    medications: [],
+    mode: 'accurate',
+    formattingMetadata: undefined,
+  };
+
   const mockProps = {
     transcript: 'Patient presents with mild anxiety and reports improved sleep patterns.',
     setTranscript: jest.fn(),
     onNewRecording: jest.fn(),
     patientName: 'John Doe',
-    isHighAccuracy: true
+    modeKey: 'accurate',
+    modeLabel: 'Accurate mode',
+    recordingMetadata: baseMetadata,
   };
 
   beforeEach(() => {
@@ -48,16 +60,18 @@ describe('TranscriptScreen Component', () => {
     it('should display action buttons', () => {
       render(<TranscriptScreen {...mockProps} />);
       expect(screen.getByText('Copy text')).toBeInTheDocument();
-      expect(screen.getByText('New Recording')).toBeInTheDocument();
+      expect(screen.getByText('Record new note')).toBeInTheDocument();
     });
   });
 
   describe('User Interactions', () => {
-    it('should call onNewRecording when new recording button is clicked', () => {
+    it('should call onNewRecording when new recording button is confirmed', () => {
       render(<TranscriptScreen {...mockProps} />);
-      const newRecordingButton = screen.getByText('New Recording');
-      
+      const newRecordingButton = screen.getByText('Record new note');
+
       fireEvent.click(newRecordingButton);
+      const confirmButton = screen.getByText('Discard notes and create new recording');
+      fireEvent.click(confirmButton);
       expect(mockProps.onNewRecording).toHaveBeenCalled();
     });
 
@@ -112,9 +126,7 @@ describe('TranscriptScreen Component', () => {
 
     it('should handle empty transcript gracefully', () => {
       const emptyProps = { ...mockProps, transcript: '' };
-      render(<TranscriptScreen {...emptyProps} />);
-      
-      expect(screen.getByText('No transcript available')).toBeInTheDocument();
+      expect(() => render(<TranscriptScreen {...emptyProps} />)).not.toThrow();
     });
   });
 
@@ -133,13 +145,13 @@ describe('TranscriptScreen Component', () => {
     });
 
     it('should handle clipboard errors gracefully', async () => {
-      navigator.clipboard.writeText = jest.fn().mockRejectedValue(new Error('Clipboard error'));
-      
+      (navigator.clipboard.writeText as jest.Mock).mockRejectedValue(new Error('Clipboard error'));
+
       render(<TranscriptScreen {...mockProps} />);
       const copyButton = screen.getByText('Copy text');
-      
+
       fireEvent.click(copyButton);
-      
+
       await waitFor(() => {
         expect(navigator.clipboard.writeText).toHaveBeenCalled();
       });

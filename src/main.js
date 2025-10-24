@@ -3,12 +3,56 @@ const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const { WhisperTranscriber } = require('./services/transcription/whisper.js');
+const { TranscriptionManager } = require('./main/transcription/TranscriptionManager');
+const { FastMode } = require('./main/transcription/modes/FastMode');
+const { AccurateMode } = require('./main/transcription/modes/AccurateMode');
+const { ProgressReporter } = require('./main/transcription/utils/ProgressReporter');
+const { WhisperCppEngine } = require('./main/transcription/engines/WhisperCppEngine');
+const { FasterWhisperBridge } = require('./main/transcription/engines/FasterWhisperBridge');
+const { FormattingManager } = require('./main/formatting/FormattingManager');
+const { ModelValidator } = require('./main/models/ModelValidator');
+const { ModelDownloader } = require('./main/models/ModelDownloader');
 
 // Keep a global reference of the window object
 let mainWindow;
 
-// Initialize Whisper transcriber
-const whisperTranscriber = new WhisperTranscriber();
+// Initialize Whisper transcriber and manager
+const sharedWhisperTranscriber = new WhisperTranscriber();
+
+const modelValidator = new ModelValidator();
+const modelDownloader = new ModelDownloader();
+
+const fastMode = new FastMode({
+  engineFactory: (config) => new WhisperCppEngine({ config, transcriber: sharedWhisperTranscriber }),
+});
+const accurateMode = new AccurateMode({
+  engineFactory: (config) => new FasterWhisperBridge({ config, transcriber: sharedWhisperTranscriber }),
+});
+
+const formattingManager = new FormattingManager();
+
+const transcriptionManager = new TranscriptionManager({
+  modes: new Map([
+    [fastMode.key, fastMode],
+    [accurateMode.key, accurateMode],
+  ]),
+  formattingManager,
+});
+
+async function warnMissingModels() {
+  try {
+    const missing = modelValidator.getMissing();
+    if (missing.length === 0) {
+      return;
+    }
+
+    const missingKeys = missing.map((entry) => entry.key || 'unknown').join(', ');
+    console.warn('[models] Missing required model assets:', missingKeys);
+    console.warn('[models] Run `pnpm node scripts/download-models.js` to fetch binaries or provide them manually.');
+  } catch (error) {
+    console.warn('[models] Failed to validate local models:', error);
+  }
+}
 
 function createWindow() {
   // Create the browser window
@@ -69,19 +113,25 @@ function createWindow() {
 
 // Initialize the app when Electron is ready
 app.whenReady().then(async () => {
-  // Initialize Whisper environment first
+  await warnMissingModels();
+
+  // Initialize transcription engines before showing UI
   try {
-    console.log('Initializing Whisper environment...');
-    const initResult = await whisperTranscriber.initializeWhisper();
-    if (initResult) {
-      console.log('Whisper environment initialized successfully');
-    } else {
-      console.warn('Whisper environment initialization failed - transcription may not work');
+    console.log('Initializing transcription engines...');
+    const defaultMode =
+      transcriptionManager.modes.get('accurate') ||
+      Array.from(transcriptionManager.modes.values())[0];
+    if (defaultMode) {
+      const engine = defaultMode.createEngine();
+      if (engine && typeof engine.initialize === 'function') {
+        await engine.initialize(defaultMode.config);
+        console.log(`Initialized transcription mode: ${defaultMode.key}`);
+      }
     }
   } catch (error) {
-    console.error('Failed to initialize Whisper during startup:', error);
+    console.error('Failed to initialize transcription engines:', error);
   }
-  
+
   // Then create the window
   createWindow();
 });
@@ -265,7 +315,7 @@ ipcMain.handle('ensure-documents-dir', async () => {
 // Whisper transcription handlers
 ipcMain.handle('initialize-whisper', async () => {
   try {
-    const success = await whisperTranscriber.initializeWhisper();
+    const success = await sharedWhisperTranscriber.initializeWhisper();
     return { success, message: success ? 'Whisper initialized successfully' : 'Failed to initialize Whisper' };
   } catch (error) {
     console.error('Error initializing Whisper:', error);
@@ -275,11 +325,43 @@ ipcMain.handle('initialize-whisper', async () => {
 
 ipcMain.handle('validate-whisper', async () => {
   try {
-    const isValid = await whisperTranscriber.validateWhisperInstallation();
+    const isValid = await sharedWhisperTranscriber.validateWhisperInstallation();
     return { success: isValid, available: isValid };
   } catch (error) {
     console.error('Error validating Whisper:', error);
     return { success: false, available: false, error: error.message };
+  }
+});
+
+ipcMain.handle('validate-model-assets', async () => {
+  try {
+    const results = modelValidator.validateAll();
+    return { success: true, results };
+  } catch (error) {
+    console.error('Error validating model assets:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('download-model-assets', async (event, options = {}) => {
+  if (process.env.DD_ALLOW_MODEL_DOWNLOADS !== '1') {
+    return {
+      success: false,
+      error: 'Model downloads disabled. Set DD_ALLOW_MODEL_DOWNLOADS=1 to enable automatic downloads.',
+    };
+  }
+
+  const keys = Array.isArray(options.keys) ? options.keys : null;
+  const selectedModels = keys && keys.length > 0
+    ? modelDownloader.models.filter((model) => keys.includes(model.key))
+    : modelDownloader.models;
+
+  try {
+    const results = await modelDownloader.ensureModels(selectedModels);
+    return { success: true, results };
+  } catch (error) {
+    console.error('Error downloading model assets:', error);
+    return { success: false, error: error.message };
   }
 });
 
@@ -288,8 +370,8 @@ ipcMain.handle('get-whisper-models', async () => {
   try {
     return {
       success: true,
-      models: whisperTranscriber.getAvailableModels(),
-      current: whisperTranscriber.getCurrentModel()
+      models: sharedWhisperTranscriber.getAvailableModels(),
+      current: sharedWhisperTranscriber.getCurrentModel()
     };
   } catch (error) {
     console.error('Error getting Whisper models:', error);
@@ -299,10 +381,10 @@ ipcMain.handle('get-whisper-models', async () => {
 
 ipcMain.handle('set-whisper-model', async (event, model) => {
   try {
-    const success = whisperTranscriber.setModel(model);
+    const success = sharedWhisperTranscriber.setModel(model);
     return {
       success,
-      current: whisperTranscriber.getCurrentModel()
+      current: sharedWhisperTranscriber.getCurrentModel()
     };
   } catch (error) {
     console.error('Error setting Whisper model:', error);
@@ -310,39 +392,160 @@ ipcMain.handle('set-whisper-model', async (event, model) => {
   }
 });
 
-ipcMain.handle('transcribe-audio', async (event, audioFilePath) => {
+ipcMain.handle('list-transcription-modes', async () => {
   try {
-    console.log('🔍 MAIN IPC - Starting transcription for:', audioFilePath);
-    const result = await whisperTranscriber.transcribeAudio(audioFilePath, (progress) => {
-      // Send progress updates to renderer
-      event.sender.send('transcription-progress', progress);
+    return {
+      success: true,
+      modes: transcriptionManager.listModes(),
+    };
+  } catch (error) {
+    console.error('Error listing transcription modes:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('format-transcript', async (event, payload) => {
+  const request =
+    typeof payload === 'string'
+      ? { transcript: payload }
+      : payload || {};
+
+  const { transcript, mode, metadata = {} } = request;
+  if (!transcript) {
+    return { success: false, error: 'Transcript is required for formatting' };
+  }
+
+  try {
+    const formatted = await formattingManager.format({
+      transcript,
+      mode,
+      metadata,
     });
-    
+    return { success: true, ...formatted };
+  } catch (error) {
+    console.error('Error formatting transcript:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('save-formatted-note', async (event, { content, filename }) => {
+  try {
+    const defaultPath = path.join(
+      app.getPath('documents'),
+      'DoctorDictate',
+      filename || `formatted-note-${Date.now()}.md`
+    );
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath,
+      filters: [
+        { name: 'Markdown', extensions: ['md'] },
+        { name: 'Text', extensions: ['txt'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    });
+
+    if (!result.canceled && result.filePath) {
+      fs.writeFileSync(result.filePath, content, 'utf8');
+      return { success: true, path: result.filePath };
+    }
+    return { success: false, canceled: true };
+  } catch (error) {
+    console.error('Error saving formatted note:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('transcribe-audio', async (event, payload) => {
+  const request =
+    typeof payload === 'string'
+      ? { audioPath: payload }
+      : payload || {};
+
+  const { audioPath, mode = 'accurate' } = request;
+  if (!audioPath) {
+    return { success: false, error: 'Audio path is required' };
+  }
+
+  const progressReporter = new ProgressReporter(
+    { audioPath, mode },
+    {
+      emitter: {
+        emit: (eventName, data) => {
+          switch (eventName) {
+            case 'stage':
+              event.sender.send('transcription-progress', {
+                mode,
+                stage: data.stage,
+                status: data.status,
+                percent: data.percent,
+                message: data.message,
+              });
+              break;
+            case 'chunk':
+              event.sender.send('transcription-progress', {
+                mode,
+                stage: 'chunk',
+                current: data.current,
+                total: data.total,
+                estimatedMsRemaining: data.estimatedMsRemaining,
+              });
+              break;
+            case 'error':
+              event.sender.send('transcription-progress', {
+                mode,
+                stage: 'error',
+                error: data.error?.message || String(data.error),
+              });
+              break;
+            case 'complete':
+              event.sender.send('transcription-progress', {
+                mode,
+                stage: 'complete',
+                metadata: data.result?.metadata,
+              });
+              break;
+            default:
+              break;
+          }
+        },
+      },
+    }
+  );
+
+  try {
+    console.log('🔍 MAIN IPC - Starting transcription for:', audioPath, 'mode:', mode);
+    const result = await transcriptionManager.transcribe({
+      audioPath,
+      mode,
+      progressReporter,
+    });
+
     console.log('🔍 MAIN IPC - Transcription complete, result keys:', Object.keys(result));
     console.log('🔍 MAIN IPC - Available transcript options:');
     console.log('  formatted length:', result.formatted?.length);
     console.log('  corrected length:', result.corrected?.length);
     console.log('  raw length:', result.raw?.length);
-    
+
     // The frontend expects a 'transcript' property
     const transcript = result.formatted || result.corrected || result.raw;
-    console.log('🔍 MAIN IPC - Selected transcript source:', 
-      result.formatted ? 'formatted' : result.corrected ? 'corrected' : 'raw');
+    console.log(
+      '🔍 MAIN IPC - Selected transcript source:',
+      result.formatted ? 'formatted' : result.corrected ? 'corrected' : 'raw'
+    );
     console.log('🔍 MAIN IPC - Final transcript length:', transcript?.length);
     console.log('🔍 MAIN IPC - Final transcript preview:', transcript?.substring(0, 100) + '...');
-    
-    const response = { 
-      success: true, 
-      transcript: transcript,
-      ...result 
+
+    const response = {
+      success: true,
+      transcript,
+      ...result,
     };
-    
+
     console.log('🔍 MAIN IPC - Returning response with transcript length:', response.transcript?.length);
     return response;
   } catch (error) {
     console.error('🔍 MAIN IPC - Error transcribing audio:', error);
-    // Ensure processing state is reset on error
-    whisperTranscriber.resetProcessingState();
+    sharedWhisperTranscriber.resetProcessingState();
     return { success: false, error: error.message };
   }
 });
@@ -350,7 +553,7 @@ ipcMain.handle('transcribe-audio', async (event, audioFilePath) => {
 // Add handler to reset transcription state
 ipcMain.handle('reset-transcription-state', async () => {
   try {
-    whisperTranscriber.resetProcessingState();
+    sharedWhisperTranscriber.resetProcessingState();
     return { success: true };
   } catch (error) {
     console.error('Error resetting transcription state:', error);
