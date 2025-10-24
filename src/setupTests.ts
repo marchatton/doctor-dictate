@@ -5,10 +5,13 @@ global.window = Object.create(window);
 Object.defineProperty(window, 'electronAPI', {
   value: {
     saveAudioBlob: jest.fn(() => Promise.resolve({ success: true, filePath: '/mock/audio.webm' })),
-    transcribeAudio: jest.fn(() => Promise.resolve({ 
-      success: true, 
-      transcript: 'Mock transcript for testing' 
+    transcribeAudio: jest.fn(() => Promise.resolve({
+      success: true,
+      transcript: 'Mock transcript for testing'
     })),
+    listTranscriptionModes: jest.fn(() =>
+      Promise.resolve({ success: true, modes: [{ key: 'mock', label: 'Mock Mode' }] })
+    ),
     setWhisperModel: jest.fn(() => Promise.resolve({ success: true })),
     onTranscriptionProgress: jest.fn(),
     removeTranscriptionProgressListener: jest.fn(),
