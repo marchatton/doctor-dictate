@@ -5,51 +5,60 @@ class ProgressReporter {
     this.logger = options.logger || console;
   }
 
-  begin(payload = {}) {
-    this.emit('begin', { ...payload, context: this.context });
-  }
-
-  reportStage(stage, payload = {}) {
-    if (!stage && payload.stage) {
-      stage = payload.stage;
-    }
+  start(stage, payload = {}) {
     this.emit('stage', {
       stage: stage || 'unknown',
+      status: 'start',
       ...payload,
-      context: this.context,
+    });
+  }
+
+  advance(stage, payload = {}) {
+    this.emit('stage', {
+      stage: stage || payload.stage || 'unknown',
+      status: 'progress',
+      ...payload,
+    });
+  }
+
+  chunkProgress(payload = {}) {
+    this.emit('chunk', {
+      status: 'chunk',
+      ...payload,
     });
   }
 
   complete(result) {
-    this.emit('complete', { result, context: this.context });
+    this.emit('complete', { result });
   }
 
   fail(error) {
-    this.emit('error', { error, context: this.context });
+    this.emit('error', { error });
   }
 
   emit(event, payload) {
+    const enriched = { ...payload, context: this.context };
     if (this.emitter && typeof this.emitter.emit === 'function') {
-      this.emitter.emit(event, payload);
+      this.emitter.emit(event, enriched);
       return;
     }
 
     const label = `[Transcription:${this.context.mode || 'unknown'}]`;
     switch (event) {
-      case 'begin':
-        this.logger.info(`${label} begin`, payload);
-        break;
       case 'stage':
-        this.logger.info(`${label} stage:${payload.stage}`, payload);
+        this.logger.info(`${label} ${enriched.status || 'stage'}:${enriched.stage}`, enriched);
+        break;
+      case 'chunk':
+        this.logger.info(`${label} chunk ${enriched.current}/${enriched.total}`, enriched);
         break;
       case 'complete':
         this.logger.info(`${label} complete`);
         break;
       case 'error':
-        this.logger.error(`${label} error`, payload.error);
+        this.logger.error(`${label} error`, enriched.error);
         break;
       default:
-        this.logger.debug(`${label} event:${event}`, payload);
+        this.logger.debug(`${label} event:${event}`, enriched);
     }
   }
 }

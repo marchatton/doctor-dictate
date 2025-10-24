@@ -7,6 +7,8 @@ const { TranscriptionManager } = require('./main/transcription/TranscriptionMana
 const { FastMode } = require('./main/transcription/modes/FastMode');
 const { AccurateMode } = require('./main/transcription/modes/AccurateMode');
 const { ProgressReporter } = require('./main/transcription/utils/ProgressReporter');
+const { WhisperCppEngine } = require('./main/transcription/engines/WhisperCppEngine');
+const { FasterWhisperBridge } = require('./main/transcription/engines/FasterWhisperBridge');
 
 // Keep a global reference of the window object
 let mainWindow;
@@ -15,10 +17,10 @@ let mainWindow;
 const sharedWhisperTranscriber = new WhisperTranscriber();
 
 const fastMode = new FastMode({
-  engineOptions: { transcriber: sharedWhisperTranscriber },
+  engineFactory: (config) => new WhisperCppEngine({ config, transcriber: sharedWhisperTranscriber }),
 });
 const accurateMode = new AccurateMode({
-  engineOptions: { transcriber: sharedWhisperTranscriber },
+  engineFactory: (config) => new FasterWhisperBridge({ config, transcriber: sharedWhisperTranscriber }),
 });
 
 const transcriptionManager = new TranscriptionManager({
@@ -360,11 +362,41 @@ ipcMain.handle('transcribe-audio', async (event, payload) => {
     {
       emitter: {
         emit: (eventName, data) => {
-          if (eventName === 'stage') {
-            const payload = data.rawProgress
-              ? { ...data.rawProgress, mode }
-              : { mode, stage: data.stage, percent: data.percent };
-            event.sender.send('transcription-progress', payload);
+          switch (eventName) {
+            case 'stage':
+              event.sender.send('transcription-progress', {
+                mode,
+                stage: data.stage,
+                status: data.status,
+                percent: data.percent,
+                message: data.message,
+              });
+              break;
+            case 'chunk':
+              event.sender.send('transcription-progress', {
+                mode,
+                stage: 'chunk',
+                current: data.current,
+                total: data.total,
+                estimatedMsRemaining: data.estimatedMsRemaining,
+              });
+              break;
+            case 'error':
+              event.sender.send('transcription-progress', {
+                mode,
+                stage: 'error',
+                error: data.error?.message || String(data.error),
+              });
+              break;
+            case 'complete':
+              event.sender.send('transcription-progress', {
+                mode,
+                stage: 'complete',
+                metadata: data.result?.metadata,
+              });
+              break;
+            default:
+              break;
           }
         },
       },

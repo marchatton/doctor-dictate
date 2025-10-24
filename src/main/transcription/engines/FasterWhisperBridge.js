@@ -1,71 +1,98 @@
-const { AudioChunker } = require('../processors/AudioChunker');
-const { VADProcessor } = require('../processors/VADProcessor');
-const { ResultMerger } = require('../processors/ResultMerger');
-const { WhisperTranscriber } = require('../../../services/transcription/whisper.js');
+const fs = require('fs');
+const path = require('path');
+const { spawn } = require('child_process');
 
 class FasterWhisperBridge {
   constructor(options = {}) {
-    this.chunkConfig = options.chunkConfig || { windowSeconds: 30, overlapSeconds: 3 };
-    this.vadConfig = options.vadConfig || { threshold: 0.5 };
-    this.audioChunker = options.audioChunker || new AudioChunker({ chunkConfig: this.chunkConfig });
-    this.vadProcessor = options.vadProcessor || new VADProcessor({ vadConfig: this.vadConfig });
-    this.resultMerger = options.resultMerger || new ResultMerger();
-    this.transcriber = options.transcriber || new WhisperTranscriber();
-    this.bridgeReady = false;
+    this.config = options.config || null;
+    this.transcriber = options.transcriber || null;
+    this.logger = options.logger || console;
+    this.pythonProcess = null;
+    this.httpClient = options.httpClient || null;
+    this.port = options.port || 8765;
   }
 
-  async initialize(mode) {
-    if (mode && mode.chunkConfig) {
-      this.audioChunker.configure(mode.chunkConfig);
-    }
-    if (mode && mode.vadConfig && typeof this.vadProcessor.configure === 'function') {
-      this.vadProcessor.configure(mode.vadConfig);
+  async initialize(config) {
+    this.config = config || this.config;
+
+    if (this.httpClient) {
+      await this.httpClient.ensureReady(this.config, this.port);
+      return;
     }
 
-    if (!this.bridgeReady && typeof this.transcriber.initializeWhisper === 'function') {
+    if (this.transcriber?.initializeWhisper) {
       await this.transcriber.initializeWhisper();
-      this.bridgeReady = true;
+      return;
+    }
+
+    if (!this.pythonProcess) {
+      await this.startPythonBridge();
     }
   }
 
-  async transcribe(context, reporter) {
-    const { audioPath } = context;
+  async startPythonBridge() {
+    const bridgePath = path.resolve(process.cwd(), 'python-bridge/faster_whisper_server.py');
+    if (!fs.existsSync(bridgePath)) {
+      this.logger.warn('[FasterWhisperBridge] Python bridge not found, falling back to local transcriber');
+      return;
+    }
 
-    try {
-      const transcription = await this.transcriber.transcribeAudio(audioPath, (progress) => {
-        if (!reporter || !progress) {
-          return;
-        }
-        const stage = progress.stage || progress.stageName || progress.phase || 'transcribing';
-        const percent =
-          progress.percent !== undefined
-            ? progress.percent
-            : progress.progress !== undefined
-            ? progress.progress
-            : progress.value !== undefined
-            ? progress.value
-            : 0;
-        reporter.reportStage(stage, {
-          percent,
-          rawProgress: progress,
-          message: progress.message,
-          stages: progress.stages,
-          isComplete: progress.isComplete,
-          showSpinner: progress.showSpinner,
-        });
-      });
+    this.pythonProcess = spawn('python3', [
+      bridgePath,
+      '--port',
+      String(this.port),
+      '--model',
+      this.config?.whisper?.modelPath || '',
+    ]);
 
-      const metadata = {
-        ...(transcription && transcription.metadata ? transcription.metadata : {}),
-        engine: 'faster-whisper',
+    this.pythonProcess.stdout.on('data', (data) => {
+      this.logger.info('[FasterWhisperBridge] python:', data.toString().trim());
+    });
+    this.pythonProcess.stderr.on('data', (data) => {
+      this.logger.error('[FasterWhisperBridge] python err:', data.toString().trim());
+    });
+  }
+
+  async transcribeChunk(chunk, context = {}) {
+    if (!chunk || !chunk.path) {
+      throw new Error('Chunk path is required for FasterWhisperBridge');
+    }
+
+    if (this.httpClient) {
+      return this.httpClient.transcribeChunk(chunk, this.config, this.port);
+    }
+
+    if (this.transcriber?.runWhisper) {
+      const text = await this.transcriber.runWhisper(chunk.path);
+      return {
+        text: text.trim(),
+        segments: [
+          {
+            start: chunk.start ?? 0,
+            end: chunk.end ?? (chunk.start ?? 0) + (chunk.duration || 0),
+            text: text.trim(),
+          },
+        ],
+        start: chunk.start ?? 0,
+        end: chunk.end ?? (chunk.start ?? 0) + (chunk.duration || 0),
+        metadata: {
+          engine: 'faster-whisper',
+          model: this.config?.whisper?.model,
+        },
       };
+    }
 
-      return { ...transcription, metadata };
-    } catch (error) {
-      if (typeof this.transcriber.resetProcessingState === 'function') {
-        this.transcriber.resetProcessingState();
-      }
-      throw error;
+    throw new Error('No Faster Whisper backend available');
+  }
+
+  async finalize() {
+    // No-op
+  }
+
+  async cleanup() {
+    if (this.pythonProcess) {
+      this.pythonProcess.kill();
+      this.pythonProcess = null;
     }
   }
 }

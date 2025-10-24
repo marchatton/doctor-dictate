@@ -2,44 +2,81 @@ class MemoryMonitor {
   constructor(options = {}) {
     this.pollingIntervalMs = options.pollingIntervalMs || 500;
     this.logger = options.logger || console;
+    this.thresholdRatio = options.thresholdRatio || 0.9;
+    this._timer = null;
+    this._limitBytes = null;
+    this._peakBytes = 0;
+    this._nearLimit = false;
   }
 
-  async runWithinBudget(budgetMb, task) {
-    if (typeof task !== 'function') {
-      throw new Error('MemoryMonitor requires a task function');
+  startMonitoring(limitMb) {
+    this.stopMonitoring();
+    this._limitBytes = typeof limitMb === 'number' && limitMb > 0 ? limitMb * 1024 * 1024 : null;
+    this._peakBytes = 0;
+    this._nearLimit = false;
+
+    if (this._limitBytes) {
+      this._timer = setInterval(() => this.sample(), this.pollingIntervalMs);
     }
 
-    const limitBytes = typeof budgetMb === 'number' && budgetMb > 0 ? budgetMb * 1024 * 1024 : null;
-    let monitorTimer = null;
-    let exceeded = false;
+    this.sample();
+  }
 
-    if (limitBytes) {
-      monitorTimer = setInterval(() => {
-        const usage = this.getProcessMemory();
-        if (usage > limitBytes) {
-          exceeded = true;
-          this.logger.warn(
-            `[MemoryMonitor] RSS ${Math.round(usage / (1024 * 1024))}MB exceeded budget of ${budgetMb}MB`
-          );
-        }
-      }, this.pollingIntervalMs);
+  stopMonitoring() {
+    if (this._timer) {
+      clearInterval(this._timer);
+      this._timer = null;
     }
+    this._limitBytes = null;
+  }
 
+  async runWithinBudget(limitMb, task) {
+    this.startMonitoring(limitMb);
     try {
-      const result = await task({ exceeded });
-      if (exceeded) {
-        this.logger.warn('[MemoryMonitor] Task completed after exceeding memory budget');
-      }
-      return result;
+      return await task();
     } finally {
-      if (monitorTimer) {
-        clearInterval(monitorTimer);
+      this.stopMonitoring();
+    }
+  }
+
+  isNearLimit() {
+    return this._nearLimit;
+  }
+
+  getPeakUsage() {
+    return Math.round(this._peakBytes / (1024 * 1024));
+  }
+
+  async requestTrim() {
+    this.logger.warn('[MemoryMonitor] Memory near limit, attempting to trim');
+    if (typeof global.gc === 'function') {
+      try {
+        global.gc();
+      } catch (error) {
+        this.logger.debug?.('[MemoryMonitor] GC trim failed', error);
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    this.sample();
+  }
+
+  sample() {
+    const usage = this.getProcessMemory();
+    this._peakBytes = Math.max(this._peakBytes, usage);
+    if (this._limitBytes) {
+      this._nearLimit = usage >= this._limitBytes * this.thresholdRatio;
+      if (this._nearLimit) {
+        this.logger.warn(
+          `[MemoryMonitor] RSS ${Math.round(usage / (1024 * 1024))}MB approaching limit ${Math.round(
+            this._limitBytes / (1024 * 1024)
+          )}MB`
+        );
       }
     }
   }
 
   getProcessMemory() {
-    const usage = process.memoryUsage();
+    const usage = process.memoryUsage?.();
     return usage && usage.rss ? usage.rss : 0;
   }
 }
