@@ -653,6 +653,15 @@ class FormattingManager {
 }
 ```
 
+### 5.3 Current Progress (2024-06-13)
+
+- Implemented the new `TranscriptionManager` with mode registration, memory monitoring, VAD integration, chunk-loop progress reporting, and metadata aggregation.
+- Added Fast and Accurate mode strategies alongside Whisper.cpp and Faster-Whisper engine shims wired through the manager API.
+- Split preprocessing into dedicated `AudioChunker`, `VADProcessor`, and `ResultMerger` utilities plus supporting `MemoryMonitor` and `ProgressReporter` helpers.
+- Updated Electron IPC handlers, preload exposure, renderer hooks, and Jest coverage to exercise the dual-mode pipeline end-to-end.
+
+**Next focus:** provision the Python Faster-Whisper bridge and local model setup scripts, build the formatting subsystem (`FormattingManager`, prompt/cache orchestration), and expose renderer mode selection with progress indicators plus Ollama model configuration.
+
 ## 6. Installation & Setup
 
 ### 6.1 Prerequisites Installation Script
@@ -801,19 +810,19 @@ const medicalTestCases = [
 
 ## 8. Migration Plan
 
-### Phase 1: Fast Mode Implementation 
-- [ ] Implement WhisperCpp engine
+### Phase 1: Fast Mode Implementation
+- [x] Implement WhisperCpp engine
 - [ ] Setup TinyLlama with Ollama
-- [ ] Create basic chunking pipeline
-- [ ] Add memory monitoring
+- [x] Create basic chunking pipeline
+- [x] Add memory monitoring
 - [ ] Basic UI mode selector
 
-### Phase 2: Accurate Mode Implementation 
+### Phase 2: Accurate Mode Implementation
 - [ ] Setup Python bridge for Faster-Whisper
-- [ ] Implement VAD processing
+- [x] Implement VAD processing
 - [ ] Add Qwen2.5 model support
-- [ ] Implement result merging with overlap handling
-- [ ] Add progress reporting
+- [x] Implement result merging with overlap handling
+- [x] Add progress reporting
 
 ### Phase 3: Optimization & Polish 
 - [ ] Add medical term caching
