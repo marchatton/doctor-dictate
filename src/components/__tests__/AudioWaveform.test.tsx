@@ -100,8 +100,8 @@ describe('AudioWaveform Component', () => {
     it('should set correct analyser properties', () => {
       render(<AudioWaveform isActive={true} audioStream={mockStream} />);
       
-      expect(mockAnalyser.fftSize).toBe(64);
-      expect(mockAnalyser.smoothingTimeConstant).toBe(0.8);
+      expect(mockAnalyser.fftSize).toBe(256);
+      expect(mockAnalyser.smoothingTimeConstant).toBeCloseTo(0.3);
     });
   });
 

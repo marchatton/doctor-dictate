@@ -161,12 +161,24 @@ class ContentVerifier {
      * Split text into sentences, handling medical dictation format
      */
     splitIntoSentences(text) {
-        // Split on period followed by space and capital letter, or "period." marker
-        const sentences = text.split(/\.(?:\s+[A-Z])|period\./gi)
-            .map(s => s.trim())
-            .filter(s => s.length > 10);  // Ignore very short segments
-        
-        return sentences;
+        if (!text) {
+            return [];
+        }
+
+        const normalized = text
+            .replace(/\r?\n+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (!normalized) {
+            return [];
+        }
+
+        const sentences = normalized.match(/[^.?!]+[.?!]|[^.?!]+$/g) || [];
+
+        return sentences
+            .map(sentence => sentence.trim())
+            .filter(sentence => sentence.length > 10);
     }
 
     /**

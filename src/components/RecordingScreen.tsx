@@ -1,13 +1,15 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { MicIcon, StopCircleIcon, CheckCircleIcon } from 'lucide-react';
 import { AudioWaveform } from './AudioWaveform';
-import { ToggleSwitch } from './ToggleSwitch';
+import { TranscriptionModeSelector } from './ui/TranscriptionModeSelector';
 
 declare global {
   interface Window {
     electronAPI: {
       saveAudioBlob: (audioBuffer: ArrayBuffer) => Promise<{success: boolean, filePath?: string, error?: string}>;
-      transcribeAudio: (filePath: string) => Promise<{success: boolean, transcript?: string, error?: string}>;
+      transcribeAudio: (
+        request: string | { audioPath: string; mode?: string }
+      ) => Promise<{success: boolean, transcript?: string, formatted?: string, metadata?: Record<string, unknown>, error?: string}>;
       setWhisperModel: (model: string) => Promise<{success: boolean}>;
       onTranscriptionProgress: (callback: (progress: any) => void) => void;
       removeTranscriptionProgressListener: () => void;
@@ -16,21 +18,30 @@ declare global {
 }
 
 interface RecordingScreenProps {
-  isHighAccuracy: boolean;
-  setIsHighAccuracy: (value: boolean) => void;
+  availableModes: Array<{
+    key: string;
+    label: string;
+    description?: string;
+    details?: string[];
+    config?: Record<string, unknown>;
+  }>;
+  selectedMode: string;
+  onSelectMode: (key: string) => void;
   isRecording: boolean;
   recordingTime: number;
   setRecordingTime: (value: number) => void;
   onStartRecording: () => void;
   onStopRecording: () => void;
-  onTranscriptionComplete: (transcript: string) => void;
+  onTranscriptionComplete: (transcript: any) => void;
   onProcessingStart: () => void;
   onProcessingProgress: (step: string, progress: number) => void;
+  onModeResolved: (mode: string, decision?: Record<string, unknown>) => void;
 }
 
 export function RecordingScreen({
-  isHighAccuracy,
-  setIsHighAccuracy,
+  availableModes,
+  selectedMode,
+  onSelectMode,
   isRecording,
   recordingTime,
   setRecordingTime,
@@ -38,23 +49,27 @@ export function RecordingScreen({
   onStopRecording,
   onTranscriptionComplete,
   onProcessingStart,
-  onProcessingProgress
+  onProcessingProgress,
+  onModeResolved,
 }: RecordingScreenProps) {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const mimeTypeRef = useRef<string>('audio/webm');
+  const currentMode = availableModes.find((mode) => mode.key === selectedMode);
   
   // Store callbacks in refs to prevent re-initialization
   const onTranscriptionCompleteRef = useRef(onTranscriptionComplete);
   const onProcessingProgressRef = useRef(onProcessingProgress);
   const onProcessingStartRef = useRef(onProcessingStart);
+  const onModeResolvedRef = useRef(onModeResolved);
   
   // Update refs when props change
   useEffect(() => {
     onTranscriptionCompleteRef.current = onTranscriptionComplete;
     onProcessingProgressRef.current = onProcessingProgress;
     onProcessingStartRef.current = onProcessingStart;
+    onModeResolvedRef.current = onModeResolved;
   });
   // Initialize media recorder - only once on component mount
   useEffect(() => {
@@ -150,6 +165,9 @@ export function RecordingScreen({
           // Set up progress listener to map backend progress to UI steps
           window.electronAPI?.onTranscriptionProgress((progress) => {
             console.log('Transcription progress:', progress);
+            if (progress.mode) {
+              onModeResolvedRef.current?.(progress.mode, progress.decision);
+            }
             if (progress.message) {
               if (progress.message.includes('Preparing audio file')) {
                 onProcessingProgressRef.current('audio', 50);
@@ -219,19 +237,22 @@ export function RecordingScreen({
             // Move to transcription
             onProcessingProgressRef.current('transcribe', 5); // Start transcription
             
-            const transcribeResult = await window.electronAPI.transcribeAudio(saveResult.filePath);
+            const transcribeResult = await window.electronAPI.transcribeAudio({
+              audioPath: saveResult.filePath,
+              mode: selectedMode,
+            });
             console.log('Transcribe result:', transcribeResult);
             
-            if (transcribeResult.success && transcribeResult.transcript) {
+            if (transcribeResult.success) {
               // Transcription complete
               onProcessingProgressRef.current('transcribe', 100);
-              
+
               // Medical corrections are done as part of transcription in backend
               onProcessingProgressRef.current('medical', 100);
-              
+
               // Finalize
               onProcessingProgressRef.current('complete', 100);
-              onTranscriptionCompleteRef.current(transcribeResult.transcript);
+              onTranscriptionCompleteRef.current(transcribeResult);
             } else {
               // If transcription failed, show error message
               console.error('Transcription failed:', transcribeResult.error);
@@ -289,11 +310,12 @@ export function RecordingScreen({
     };
   }, []); // Empty dependency array - only run once on mount
 
-  // Set Whisper model based on accuracy setting
+  // Set Whisper model based on selected mode
   useEffect(() => {
-    const model = isHighAccuracy ? 'small.en' : 'tiny.en';
+    const modeConfig = (currentMode?.config as Record<string, any>) || {};
+    const model = modeConfig?.whisper?.model || (selectedMode === 'fast' ? 'base.en' : 'small.en');
     window.electronAPI?.setWhisperModel(model);
-  }, [isHighAccuracy]);
+  }, [selectedMode, currentMode]);
 
   // Timer effect for recording
   useEffect(() => {
@@ -327,9 +349,20 @@ export function RecordingScreen({
             <span>10 minute maximum • Processes in ~2-3 minutes</span>
           </p>
         </div>
-        <div className={`transition-all duration-300 ${isRecording ? 'opacity-60 pointer-events-none' : ''}`}>
-          <ToggleSwitch label="High accuracy" secondaryLabel="Slower" isChecked={isHighAccuracy} onChange={setIsHighAccuracy} disabled={isRecording} />
+        <div
+          className={`transition-all duration-300 w-full md:w-80 ${
+            isRecording ? 'opacity-60 pointer-events-none' : ''
+          }`}
+        >
+          <TranscriptionModeSelector
+            modes={availableModes}
+            selectedKey={selectedMode}
+            onSelect={onSelectMode}
+          />
         </div>
+      </div>
+      <div className="px-6 md:px-8 text-sm text-stone-500">
+        {currentMode?.description || 'Select a mode to balance speed and accuracy for your note.'}
       </div>
       <div className="text-center py-8 flex justify-center items-center">
         <div className={`text-6xl font-mono text-stone-800 font-light transition-all duration-300 ${isRecording ? 'text-[#6B1F1F]' : ''}`}>

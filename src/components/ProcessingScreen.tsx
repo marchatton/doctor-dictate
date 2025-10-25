@@ -1,22 +1,41 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircleIcon, CircleIcon, Clock3Icon } from 'lucide-react';
+interface ModeDecision {
+  mode?: string;
+  reason?: string;
+  heuristics?: {
+    audio?: {
+      durationSeconds?: number;
+      fileSizeBytes?: number;
+    };
+    system?: {
+      totalMemMB?: number;
+      freeMemMB?: number;
+    };
+  };
+}
+
 interface ProcessingScreenProps {
-  isHighAccuracy: boolean;
+  modeKey: string;
+  modeLabel: string;
   processingStep: string;
   processingProgress: number;
   minutesProcessed?: number;
   totalMinutes?: number;
+  modeDecision?: ModeDecision | null;
 }
 export function ProcessingScreen({
-  isHighAccuracy,
+  modeKey,
+  modeLabel,
   processingStep,
   processingProgress,
   minutesProcessed = 0,
-  totalMinutes = 0
+  totalMinutes = 0,
+  modeDecision = null,
 }: ProcessingScreenProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [progressPercentage, setProgressPercentage] = useState(0);
-  const processingTime = isHighAccuracy ? 3 : 1;
+  const processingTime = modeKey === 'fast' ? 1 : 3;
   const PROCESSING_STEPS = [{
     id: 'audio',
     label: 'Preparing audio',
@@ -53,11 +72,34 @@ export function ProcessingScreen({
       setProgressPercentage(baseProgress + currentStepProgress);
     }
   }, [processingStep, processingProgress]);
+  const decisionReasonMap: Record<string, string> = {
+    'long-duration': 'Smart mode chose the faster pipeline for a long recording.',
+    'large-file': 'Large audio size triggered the faster pipeline.',
+    'duration-memory': 'Fast mode selected to balance duration and system memory.',
+    'limited-memory': 'Fast mode selected due to limited system memory.',
+    'low-free-memory': 'Fast mode selected to prevent swapping.',
+    'short-audio': 'Accurate mode selected for a short recording.',
+  };
+
+  const decisionNote = modeDecision?.reason ? decisionReasonMap[modeDecision.reason] || `Smart mode applied: ${modeDecision.reason}` : null;
+  const minutes = modeDecision?.heuristics?.audio?.durationSeconds
+    ? Math.round((modeDecision.heuristics.audio.durationSeconds / 60) * 10) / 10
+    : null;
+
   return <div className="bg-white rounded-xl shadow-xl p-8 max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-8">
-        <h2 className="font-serif text-3xl text-stone-900 font-semibold">
-          Converting to notes
-        </h2>
+        <div>
+          <h2 className="font-serif text-3xl text-stone-900 font-semibold">
+            Converting to notes
+          </h2>
+          <p className="text-sm text-stone-500">Mode: {modeLabel || modeKey}</p>
+          {decisionNote ? (
+            <p className="text-xs text-amber-700 mt-1">
+              {decisionNote}
+              {minutes ? ` • Duration detected: ${minutes} min` : null}
+            </p>
+          ) : null}
+        </div>
       </div>
       <div className="space-y-4 mb-8">
         {PROCESSING_STEPS.map((step, index) => {

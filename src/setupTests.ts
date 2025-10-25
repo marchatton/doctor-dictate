@@ -5,13 +5,20 @@ global.window = Object.create(window);
 Object.defineProperty(window, 'electronAPI', {
   value: {
     saveAudioBlob: jest.fn(() => Promise.resolve({ success: true, filePath: '/mock/audio.webm' })),
-    transcribeAudio: jest.fn(() => Promise.resolve({ 
-      success: true, 
-      transcript: 'Mock transcript for testing' 
+    transcribeAudio: jest.fn(() => Promise.resolve({
+      success: true,
+      transcript: 'Mock transcript for testing'
     })),
+    listTranscriptionModes: jest.fn(() =>
+      Promise.resolve({ success: true, modes: [{ key: 'mock', label: 'Mock Mode' }] })
+    ),
     setWhisperModel: jest.fn(() => Promise.resolve({ success: true })),
     onTranscriptionProgress: jest.fn(),
     removeTranscriptionProgressListener: jest.fn(),
+    formatTranscript: jest.fn(() =>
+      Promise.resolve({ success: true, formatted: 'Mock formatted transcript', segments: [] })
+    ),
+    saveFormattedNote: jest.fn(() => Promise.resolve({ success: true, path: '/mock/formatted.md' })),
     saveTranscript: jest.fn(() => Promise.resolve({ success: true })),
     exportPDF: jest.fn(() => Promise.resolve({ success: true })),
     getWhisperModels: jest.fn(() => Promise.resolve({ 
@@ -56,7 +63,8 @@ Object.defineProperty(navigator, 'mediaDevices', {
 // Mock AudioContext
 global.AudioContext = jest.fn().mockImplementation(() => ({
   createMediaStreamSource: jest.fn(() => ({
-    connect: jest.fn()
+    connect: jest.fn(),
+    disconnect: jest.fn()
   })),
   createAnalyser: jest.fn(() => ({
     fftSize: 2048,
