@@ -4,7 +4,10 @@ declare global {
   interface Window {
     electronAPI: {
       saveAudioBlob: (audioBuffer: ArrayBuffer) => Promise<{success: boolean, filePath?: string, error?: string}>;
-      transcribeAudio: (filePath: string) => Promise<{success: boolean, transcript?: string, error?: string}>;
+      transcribeAudio: (
+        request: string | { audioPath: string; mode?: string }
+      ) => Promise<{success: boolean, transcript?: string, error?: string}>;
+      listTranscriptionModes: () => Promise<{success: boolean, modes?: Array<{ key: string; label: string }>, error?: string}>;
       setWhisperModel: (model: string) => Promise<{success: boolean}>;
       onTranscriptionProgress: (callback: (progress: any) => void) => void;
       removeTranscriptionProgressListener: () => void;
@@ -20,8 +23,12 @@ export function useElectronAPI() {
     return window.electronAPI.saveAudioBlob(arrayBuffer);
   }, []);
   
-  const transcribeAudio = useCallback(async (filePath: string) => {
-    return window.electronAPI.transcribeAudio(filePath);
+  const transcribeAudio = useCallback(async (request: string | { audioPath: string; mode?: string }) => {
+    return window.electronAPI.transcribeAudio(request);
+  }, []);
+
+  const listTranscriptionModes = useCallback(async () => {
+    return window.electronAPI.listTranscriptionModes();
   }, []);
   
   const setWhisperModel = useCallback(async (model: string) => {
@@ -48,6 +55,7 @@ export function useElectronAPI() {
     saveAudioBlob,
     transcribeAudio,
     setWhisperModel,
+    listTranscriptionModes,
     formatTranscript,
     saveFormattedNote,
     onTranscriptionProgress,

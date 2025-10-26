@@ -81,10 +81,14 @@ export function TranscriptScreen({
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
   
-  const handleCopyTranscript = () => {
-    navigator.clipboard.writeText(filteredTranscript);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopyTranscript = async () => {
+    try {
+      await navigator.clipboard.writeText(filteredTranscript);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Error copying transcript:', error);
+    }
   };
 
   const handleSaveTranscript = async () => {
