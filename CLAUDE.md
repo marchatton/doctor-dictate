@@ -1,199 +1,138 @@
-# Development Guidelines for Claude - Condensed Version
+# CLAUDE.md (DoctorDictate)
 
-## Core Philosophy
+**Purpose:** Guardrails for Claude Code within DoctorDictate. Emphasise local-only processing, strict TypeScript, and test-first changes. Defaults: **pnpm**, Electron main + React renderer, Jest, Tailwind. In all interactions and comment messages, be extremely concise and sacrifice grammar for the sake of concision.
 
-**TEST-DRIVEN DEVELOPMENT IS MANDATORY.** Write tests first, always. No production code without a failing test.
+**Claude-critical overlays:**
+- Start by reading relevant files, then outline a plan before editing or running commands.
+- Keep `.claude/settings.json` limited to `Edit` and vetted `Bash(...)` calls; no unchecked external scripts.
+- Clear prior context between tasks and maintain scratch notes in-branch if workflows span sessions.
+- Prefer scripted automation (`pnpm run …`) over ad-hoc commands; when unsure, ask before acting.
+- Long refactors should land in stages with tests proving each behavioral change.
 
-**LOCAL-FIRST FOR MEDICAL DATA.** Process sensitive data entirely on-device using Whisper and Ollama. No external APIs.
+---
 
-## Quick Reference
+## 0) Engineering Principles
 
-### Key Principles
-- TDD: Red → Green → Refactor
-- TypeScript strict mode (no `any`, no type assertions)
-- Immutable data only
-- Test behavior, not implementation
-- 100% coverage through business behavior tests
+- **TDD**: begin with a failing Jest/RTL spec for new behavior or regressions.
+- **Local-first privacy**: never add network calls or external services—dictation may contain PHI.
+- **KISS & YAGNI**: implement the simplest approach that satisfies current requirements; defer speculative hooks until confirmed.
+- **DRY**: extend existing dictionaries/prompts/templates rather than duplicating rules.
 
-### Tech Stack
-- **Language**: TypeScript (strict)
-- **Testing**: Jest/Vitest + React Testing Library
-- **Desktop**: Electron
-- **Transcription**: Whisper.cpp (local)
-- **Formatting**: Ollama (local)
+---
 
-## Core Principles Snapshot
+## 1) Project Profile & Non-negotiables
 
-- **SOLID**: Focus responsibilities; extend via additions; honor contracts; keep interfaces lean; depend on abstractions.
-- **DRY**: Keep each rule in one place; refactor duplicates quickly.
-- **KISS**: Prefer the simplest workable shape; cut needless abstractions.
-- **YAGNI**: Skip future bets until the need is proven.
-- **Convention over Configuration**: Follow shared defaults before introducing knobs.
-- **Composition over Inheritance**: Assemble behavior from collaborators, not deep trees.
-- **Law of Demeter**: Talk to direct collaborators only—no long chains.
+- **Electron shell:** `src/main.js` (IPC + window lifecycle), `src/preload.js` (contextBridge API surface).
+- **Renderer:** React 18 via Vite entry point (`src/index.tsx`, `src/App.tsx`), styled with Tailwind utilities.
+- **Domain services:** Local Whisper.cpp integration (`src/services/transcription`), audio preprocessing (`src/services/audio`), Ollama formatter (`src/services/formatting`).
+- **Testing:** Jest + Testing Library (`pnpm test`, colocated `__tests__/`). Aim to maintain coverage (`pnpm run test:coverage`).
+- **Package manager:** `pnpm`; keep lockfile tidy and prefer `pnpm` equivalents over npm.
+- **TypeScript:** strict configuration; avoid `any`/type assertions, favor pure data flows.
+- **Security:** maintain context isolation; any new IPC handler needs explicit validation and renderer-safe exposure.
 
-## Testing
+---
 
-### TDD Process
-1. **Red**: Write failing test for desired behavior
-2. **Green**: Write minimal code to pass
-3. **Refactor**: Improve if needed, keep tests green
+## 2) Structure & Security Boundaries
 
-### Test Organization
-- Test through public APIs only
-- No 1:1 mapping between test and implementation files
-- Use factory functions for test data with real schemas
+**Key directories**
 
-```typescript
-// Import real schemas - never redefine in tests
-import { ProjectSchema, type Project } from "@your-org/schemas";
-
-const getMockProject = (overrides?: Partial<Project>): Project => {
-  return ProjectSchema.parse({
-    id: "proj_123",
-    name: "Test Project",
-    ...overrides,
-  });
-};
+```
+src/
+  main.js                 # Electron main process
+  preload.js              # limited IPC bridge
+  App.tsx / index.tsx     # renderer entry + flow coordinator
+  components/             # UI pieces (Recording, Processing, Transcript screens)
+  services/               # audio/transcription/formatting pipeline
+  data/                   # medical dictionary & dictation commands
+  prompts/                # prompt builders + compiled prompt artefacts
+  templates/              # structured note templates
+  utils/                  # renderer helpers/filters
 ```
 
-## TypeScript Requirements
+**Rules to enforce**
 
-### Strict Mode Always
-```json
-{
-  "compilerOptions": {
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true
-  }
-}
+- Renderer must go through `window.electronAPI`; no direct `fs`/`path` imports.
+- IPC handlers require validation, error handling, and fallbacks (especially around Whisper/Ollama availability).
+- Keep template/prompt generation deterministic; regenerate compiled prompts when inputs change.
+- Log sparingly to avoid leaking PHI; scrub or summarise sensitive data.
+
+---
+
+## 3) Do / Don’t (Repo-specific)
+
+**Do**
+
+- Use `pnpm` scripts for dev/test/build; document any new script additions.
+- Add or update tests alongside feature work; aim for deterministic fixtures when mocking transcription.
+- Preserve verbatim dictation through transformations; any correction logic belongs in `src/data` or dedicated services.
+- Note meaningful operational findings in `CLAUDE.md` or `docs/` after validation.
+- Keep PRs focused—tests, implementation, and documentation for one concern at a time.
+
+**Don’t**
+
+- Introduce outbound networking or third-party telemetry.
+- Expand preload exposure without matching secure handling in the main process.
+- Commit failing tests, lint errors, or type errors.
+- Duplicate template or prompt logic—extend shared modules instead.
+
+---
+
+## 4) Commands (pnpm)
+
+```bash
+# Dev loop (Vite + Electron)
+pnpm run dev
+
+# Electron packaged shell
+pnpm start
+
+# Build renderer bundle
+pnpm run react:build
+
+# Full build with electron-builder
+pnpm run build
+
+# Tests / coverage
+pnpm test
+pnpm run test:watch
+pnpm run test:coverage
+
+# Lint & format
+pnpm run lint
+pnpm run lint:fix
+
+# Rebuild compiled prompts after edits
+pnpm run build-prompt
 ```
 
-### Schema-First with Zod
-```typescript
-// Define schema first
-const UserSchema = z.object({
-  email: z.string().email(),
-  age: z.number().positive(),
-});
+---
 
-// Derive type from schema
-type User = z.infer<typeof UserSchema>;
+## 5) Git & Workflow
 
-// Use for runtime validation
-const parseUser = (data: unknown): User => UserSchema.parse(data);
-```
+- Follow Conventional Commits (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`, `improvement:`).
+- Bundle failing test + fix together; keep refactors separate from behavior changes when possible.
+- Run `pnpm run test:coverage` and `pnpm run lint` locally before opening or updating PRs.
+- Include validation notes in PR descriptions, especially for audio/transcription changes.
 
-## Code Style
+---
 
-### Functional Programming
-- No mutation - use immutable updates
-- Pure functions wherever possible
-- Early returns over nested conditionals
-- Prefer options objects for function parameters
+## 6) Lint / Format / Checks
 
-```typescript
-// Good: Options object
-type CreatePaymentOptions = {
-  amount: number;
-  currency: string;
-  cardId: string;
-};
+- Rely on `pnpm run lint` (ESLint) for TypeScript + React + Tailwind conventions.
+- Prettier runs via ESLint config; keep className ordering consistent.
+- Use `pnpm run build` for higher-risk refactors to ensure the packaged app still builds.
+- Manual diligence required for dead code—no automated ast-grep/knip in this repo yet.
 
-const createPayment = (options: CreatePaymentOptions): Payment => {
-  const { amount, currency, cardId } = options;
-  // implementation
-};
+---
 
-// Good: Immutable update
-const addItem = (items: Item[], newItem: Item): Item[] => {
-  return [...items, newItem];
-};
-```
+## 7) Testing Expectations
 
-### No Comments
-Code must be self-documenting through clear naming and structure.
+- Co-locate unit/component tests with modules under `__tests__/`.
+- For renderer flows, use Testing Library; mock IPC via window stubs where necessary.
+- Integration scripts under `test/` should be updated when workflows change.
+- Regression bugs must gain a failing test reproducing the issue before the fix.
+- Whisper/Ollama variability: isolate deterministic stages, inject seams for mocking, and document any manual validation steps.
 
-## Refactoring Principles
+---
 
-### When to Refactor
-- After getting tests green (not optional - assess every time)
-- Only refactor if it improves the code
-- Commit before and after refactoring
-
-### DRY = Don't Repeat Knowledge
-Not about eliminating similar code, but about single sources of truth for business rules.
-
-```typescript
-// NOT a DRY violation - different business rules
-const validateAge = (age: number): boolean => age >= 18 && age <= 100;
-const validateRating = (rating: number): boolean => rating >= 1 && rating <= 5;
-
-// IS a DRY violation - same knowledge repeated
-const FREE_SHIPPING = 50; // Single source of truth
-const calculateShipping = (total: number): number => 
-  total > FREE_SHIPPING ? 0 : 5.99;
-```
-
-### Only Abstract Semantic Similarity
-Create abstractions when code shares meaning, not just structure.
-
-## Medical Project Specifics
-
-### Data Integrity
-- **Never lose content**: 100% preservation from dictation
-- **Preserve exact wording**: Keep medical terminology as dictated
-- **Verify coverage**: 80% threshold checks
-- **Template-driven**: Use `templates/format/*.json`
-
-### Local Service Pattern
-```typescript
-const processWithFallback = async (audio: AudioBuffer): Promise<Result> => {
-  if (!await checkWhisperService()) {
-    return { error: 'Whisper unavailable' };
-  }
-  
-  const transcript = await transcribe(audio);
-  
-  if (!await checkOllamaService()) {
-    return { text: transcript, formatted: false };
-  }
-  
-  return { text: await format(transcript), formatted: true };
-};
-```
-
-### Audio Pipeline
-```
-Audio → Whisper (local) → Ollama (local) → Verification → Output
-```
-
-## Working with Claude
-
-### Expectations
-1. **Always follow TDD** - no exceptions
-2. **Think deeply** before edits
-3. **Ask questions** when ambiguous
-4. **Assess refactoring** after every green
-5. **Explore root causes** consider 4-7 reasons why a bug might be caused and order by probability
-6. **Update docs** - Add discoveries to this file
-
-### Anti-Patterns to Avoid
-```typescript
-// Never
-items.push(newItem);                    // Mutation
-if (user) { if (active) { ... }}       // Nested conditionals
-const api = await cloudAPI(data);       // External APIs for medical data
-text = text.substring(0, 1000);        // Truncating medical content
-```
-
-## Updates Log
-Add discoveries that would have been helpful to know:
-- Whisper requires WAV format (convert m4a/mp3 first)
-- Ollama needs 60-second timeout for long medical notes
-- FFmpeg required for audio conversion
-- Models must be in `~/.whisper-cpp/models/`
-
-## Summary
-Write clean, tested, functional code through small increments. Every change driven by a test. Patient data never leaves device. 100% content preservation is mandatory.
+Architectural refactors are in motion—prefer current source code over legacy diagrams (`docs/design/system-architecture.md`, README) when resolving ambiguities.
