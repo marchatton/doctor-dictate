@@ -11,6 +11,8 @@ describe('TranscriptScreen Component', () => {
     correctionsCount: 0,
     corrections: [],
     medications: [],
+    mode: 'accurate',
+    formattingMetadata: undefined,
   };
 
   const mockProps = {
@@ -18,7 +20,8 @@ describe('TranscriptScreen Component', () => {
     setTranscript: jest.fn(),
     onNewRecording: jest.fn(),
     patientName: 'John Doe',
-    isHighAccuracy: true,
+    modeKey: 'accurate',
+    modeLabel: 'Accurate mode',
     recordingMetadata: baseMetadata,
   };
 

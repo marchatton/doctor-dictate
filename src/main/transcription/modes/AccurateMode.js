@@ -13,7 +13,7 @@ class AccurateMode {
       whisper: {
         implementation: 'faster-whisper',
         model: 'small.en',
-        modelPath: './models/faster-whisper/small.en',
+        modelPath: './models/faster-whisper/small.en.bin',
         settings: {
           device: 'cpu',
           computeType: 'int8',

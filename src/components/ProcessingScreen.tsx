@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircleIcon, CircleIcon, Clock3Icon } from 'lucide-react';
 interface ProcessingScreenProps {
-  isHighAccuracy: boolean;
+  modeKey: string;
+  modeLabel: string;
   processingStep: string;
   processingProgress: number;
   minutesProcessed?: number;
   totalMinutes?: number;
 }
 export function ProcessingScreen({
-  isHighAccuracy,
+  modeKey,
+  modeLabel,
   processingStep,
   processingProgress,
   minutesProcessed = 0,
@@ -16,7 +18,7 @@ export function ProcessingScreen({
 }: ProcessingScreenProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [progressPercentage, setProgressPercentage] = useState(0);
-  const processingTime = isHighAccuracy ? 3 : 1;
+  const processingTime = modeKey === 'fast' ? 1 : 3;
   const PROCESSING_STEPS = [{
     id: 'audio',
     label: 'Preparing audio',
@@ -55,9 +57,12 @@ export function ProcessingScreen({
   }, [processingStep, processingProgress]);
   return <div className="bg-white rounded-xl shadow-xl p-8 max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-8">
-        <h2 className="font-serif text-3xl text-stone-900 font-semibold">
-          Converting to notes
-        </h2>
+        <div>
+          <h2 className="font-serif text-3xl text-stone-900 font-semibold">
+            Converting to notes
+          </h2>
+          <p className="text-sm text-stone-500">Mode: {modeLabel || modeKey}</p>
+        </div>
       </div>
       <div className="space-y-4 mb-8">
         {PROCESSING_STEPS.map((step, index) => {

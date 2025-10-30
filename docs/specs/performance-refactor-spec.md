@@ -659,8 +659,10 @@ class FormattingManager {
 - Added Fast and Accurate mode strategies alongside Whisper.cpp and Faster-Whisper engine shims wired through the manager API.
 - Split preprocessing into dedicated `AudioChunker`, `VADProcessor`, and `ResultMerger` utilities plus supporting `MemoryMonitor` and `ProgressReporter` helpers.
 - Updated Electron IPC handlers, preload exposure, renderer hooks, and Jest coverage to exercise the dual-mode pipeline end-to-end.
+- Delivered the formatting subsystem (prompt management, Ollama client, caching, and renderer mode selector) plus Faster-Whisper bridge tooling and setup scripts to cover dual-mode workflows.
+- Introduced model validation/downloader utilities and surfaced IPC helpers to flag missing binaries before engine initialization.
 
-**Next focus:** provision the Python Faster-Whisper bridge and local model setup scripts, build the formatting subsystem (`FormattingManager`, prompt/cache orchestration), and expose renderer mode selection with progress indicators plus Ollama model configuration.
+**Next focus:** surface model readiness status in the renderer, wire automated performance benchmarks and cache hit telemetry, expand error handling around the Python bridge lifecycle, and document Ollama/TinyLlama provisioning flows.
 
 ## 6. Installation & Setup
 
@@ -815,17 +817,17 @@ const medicalTestCases = [
 - [ ] Setup TinyLlama with Ollama
 - [x] Create basic chunking pipeline
 - [x] Add memory monitoring
-- [ ] Basic UI mode selector
+- [x] Basic UI mode selector
 
 ### Phase 2: Accurate Mode Implementation
-- [ ] Setup Python bridge for Faster-Whisper
+- [x] Setup Python bridge for Faster-Whisper
 - [x] Implement VAD processing
 - [ ] Add Qwen2.5 model support
 - [x] Implement result merging with overlap handling
 - [x] Add progress reporting
 
-### Phase 3: Optimization & Polish 
-- [ ] Add medical term caching
+### Phase 3: Optimization & Polish
+- [x] Add medical term caching
 - [ ] Implement smart mode selection
 - [ ] Add comprehensive error handling
 - [ ] Performance profiling and optimization

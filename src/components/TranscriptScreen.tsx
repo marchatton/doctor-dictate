@@ -18,6 +18,8 @@ interface RecordingMetadata {
   correctionsCount: number;
   corrections: {original: string, corrected: string, context: string}[];
   medications: string[];
+  mode?: string;
+  formattingMetadata?: Record<string, unknown>;
 }
 
 interface TranscriptScreenProps {
@@ -25,7 +27,8 @@ interface TranscriptScreenProps {
   setTranscript: (value: string) => void;
   onNewRecording: () => void;
   patientName: string;
-  isHighAccuracy: boolean;
+  modeKey: string;
+  modeLabel: string;
   recordingMetadata: RecordingMetadata;
 }
 export function TranscriptScreen({
@@ -33,7 +36,8 @@ export function TranscriptScreen({
   setTranscript,
   onNewRecording,
   patientName,
-  isHighAccuracy,
+  modeKey,
+  modeLabel,
   recordingMetadata
 }: TranscriptScreenProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -175,7 +179,7 @@ export function TranscriptScreen({
               <div className="flex justify-between items-center p-2 bg-white rounded-md">
                 <span className="text-stone-500">Model:</span>
                 <span className="font-medium text-stone-800">
-                  {isHighAccuracy ? 'High accuracy' : 'Standard'}
+                  {modeLabel || modeKey}
                 </span>
               </div>
             </div>

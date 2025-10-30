@@ -9,12 +9,18 @@ const { AccurateMode } = require('./main/transcription/modes/AccurateMode');
 const { ProgressReporter } = require('./main/transcription/utils/ProgressReporter');
 const { WhisperCppEngine } = require('./main/transcription/engines/WhisperCppEngine');
 const { FasterWhisperBridge } = require('./main/transcription/engines/FasterWhisperBridge');
+const { FormattingManager } = require('./main/formatting/FormattingManager');
+const { ModelValidator } = require('./main/models/ModelValidator');
+const { ModelDownloader } = require('./main/models/ModelDownloader');
 
 // Keep a global reference of the window object
 let mainWindow;
 
 // Initialize Whisper transcriber and manager
 const sharedWhisperTranscriber = new WhisperTranscriber();
+
+const modelValidator = new ModelValidator();
+const modelDownloader = new ModelDownloader();
 
 const fastMode = new FastMode({
   engineFactory: (config) => new WhisperCppEngine({ config, transcriber: sharedWhisperTranscriber }),
@@ -23,12 +29,30 @@ const accurateMode = new AccurateMode({
   engineFactory: (config) => new FasterWhisperBridge({ config, transcriber: sharedWhisperTranscriber }),
 });
 
+const formattingManager = new FormattingManager();
+
 const transcriptionManager = new TranscriptionManager({
   modes: new Map([
     [fastMode.key, fastMode],
     [accurateMode.key, accurateMode],
   ]),
+  formattingManager,
 });
+
+async function warnMissingModels() {
+  try {
+    const missing = modelValidator.getMissing();
+    if (missing.length === 0) {
+      return;
+    }
+
+    const missingKeys = missing.map((entry) => entry.key || 'unknown').join(', ');
+    console.warn('[models] Missing required model assets:', missingKeys);
+    console.warn('[models] Run `pnpm node scripts/download-models.js` to fetch binaries or provide them manually.');
+  } catch (error) {
+    console.warn('[models] Failed to validate local models:', error);
+  }
+}
 
 function createWindow() {
   // Create the browser window
@@ -89,6 +113,8 @@ function createWindow() {
 
 // Initialize the app when Electron is ready
 app.whenReady().then(async () => {
+  await warnMissingModels();
+
   // Initialize transcription engines before showing UI
   try {
     console.log('Initializing transcription engines...');
@@ -98,7 +124,7 @@ app.whenReady().then(async () => {
     if (defaultMode) {
       const engine = defaultMode.createEngine();
       if (engine && typeof engine.initialize === 'function') {
-        await engine.initialize(defaultMode);
+        await engine.initialize(defaultMode.config);
         console.log(`Initialized transcription mode: ${defaultMode.key}`);
       }
     }
@@ -307,6 +333,38 @@ ipcMain.handle('validate-whisper', async () => {
   }
 });
 
+ipcMain.handle('validate-model-assets', async () => {
+  try {
+    const results = modelValidator.validateAll();
+    return { success: true, results };
+  } catch (error) {
+    console.error('Error validating model assets:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('download-model-assets', async (event, options = {}) => {
+  if (process.env.DD_ALLOW_MODEL_DOWNLOADS !== '1') {
+    return {
+      success: false,
+      error: 'Model downloads disabled. Set DD_ALLOW_MODEL_DOWNLOADS=1 to enable automatic downloads.',
+    };
+  }
+
+  const keys = Array.isArray(options.keys) ? options.keys : null;
+  const selectedModels = keys && keys.length > 0
+    ? modelDownloader.models.filter((model) => keys.includes(model.key))
+    : modelDownloader.models;
+
+  try {
+    const results = await modelDownloader.ensureModels(selectedModels);
+    return { success: true, results };
+  } catch (error) {
+    console.error('Error downloading model assets:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Model selection handlers
 ipcMain.handle('get-whisper-models', async () => {
   try {
@@ -342,6 +400,57 @@ ipcMain.handle('list-transcription-modes', async () => {
     };
   } catch (error) {
     console.error('Error listing transcription modes:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('format-transcript', async (event, payload) => {
+  const request =
+    typeof payload === 'string'
+      ? { transcript: payload }
+      : payload || {};
+
+  const { transcript, mode, metadata = {} } = request;
+  if (!transcript) {
+    return { success: false, error: 'Transcript is required for formatting' };
+  }
+
+  try {
+    const formatted = await formattingManager.format({
+      transcript,
+      mode,
+      metadata,
+    });
+    return { success: true, ...formatted };
+  } catch (error) {
+    console.error('Error formatting transcript:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('save-formatted-note', async (event, { content, filename }) => {
+  try {
+    const defaultPath = path.join(
+      app.getPath('documents'),
+      'DoctorDictate',
+      filename || `formatted-note-${Date.now()}.md`
+    );
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath,
+      filters: [
+        { name: 'Markdown', extensions: ['md'] },
+        { name: 'Text', extensions: ['txt'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    });
+
+    if (!result.canceled && result.filePath) {
+      fs.writeFileSync(result.filePath, content, 'utf8');
+      return { success: true, path: result.filePath };
+    }
+    return { success: false, canceled: true };
+  } catch (error) {
+    console.error('Error saving formatted note:', error);
     return { success: false, error: error.message };
   }
 });
@@ -428,7 +537,7 @@ ipcMain.handle('transcribe-audio', async (event, payload) => {
 
     const response = {
       success: true,
-      transcript: transcript,
+      transcript,
       ...result,
     };
 

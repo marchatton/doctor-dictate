@@ -13,6 +13,7 @@ class TranscriptionManager {
       memoryMonitor,
       processors = {},
       progressReporterFactory,
+      formattingManager,
     } = options;
 
     this.modes = modes instanceof Map ? modes : this.createDefaultModes();
@@ -22,6 +23,7 @@ class TranscriptionManager {
     this.resultMerger = processors.resultMerger || new ResultMerger();
     this.progressReporterFactory =
       progressReporterFactory || ((context) => new ProgressReporter(context));
+    this.formattingManager = formattingManager || null;
   }
 
   createDefaultModes() {
@@ -104,12 +106,44 @@ class TranscriptionManager {
         await engine.finalize(chunkResults, { config });
       }
 
-      const merged = await this.resultMerger.merge({
+      let merged = await this.resultMerger.merge({
         chunks: chunkResults,
         duration: segmentResult.duration,
         mode: selectedMode.key,
         config,
       });
+
+      if (this.formattingManager && merged.text) {
+        progressReporter.advance('formatting', {
+          stage: 'formatting',
+          totalSegments: chunkResults.length,
+        });
+
+        try {
+          const formatting = await this.formattingManager.format({
+            transcript: merged.text,
+            mode: config.formatting?.mode || selectedMode.key,
+            metadata: {
+              mode: selectedMode.key,
+              duration: segmentResult.duration,
+              config,
+            },
+          });
+
+          merged = {
+            ...merged,
+            formatted: formatting.formatted,
+            formattingMetadata: formatting.metadata,
+            formattingSegments: formatting.segments,
+          };
+        } catch (formattingError) {
+          progressReporter.advance('formatting', {
+            stage: 'formatting-error',
+            error: formattingError.message,
+          });
+          throw formattingError;
+        }
+      }
 
       const result = this.attachMetadata(merged, {
         mode: selectedMode.key,
@@ -224,6 +258,7 @@ class TranscriptionManager {
       engine: config.whisper?.implementation || 'unknown',
       processingTimeMs,
       peakMemoryMB: this.memoryMonitor.getPeakUsage(),
+      formatting: result?.formattingMetadata,
     };
 
     return {
@@ -234,6 +269,7 @@ class TranscriptionManager {
       raw: result?.raw,
       corrected: result?.corrected,
       formatted: result?.formatted,
+      formattingSegments: result?.formattingSegments,
     };
   }
 }

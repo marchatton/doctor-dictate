@@ -5,7 +5,8 @@ import { ProcessingScreen } from '../ProcessingScreen';
 const renderProcessing = (props: Partial<React.ComponentProps<typeof ProcessingScreen>> = {}) =>
   render(
     <ProcessingScreen
-      isHighAccuracy
+      modeKey="accurate"
+      modeLabel="Accurate mode"
       processingStep="audio"
       processingProgress={0}
       {...props}
@@ -16,6 +17,7 @@ describe('ProcessingScreen', () => {
   it('renders the primary heading', () => {
     renderProcessing();
     expect(screen.getByText('Converting to notes')).toBeInTheDocument();
+    expect(screen.getByText(/Mode: Accurate mode/)).toBeInTheDocument();
   });
 
   it('lists every processing step with default statuses', () => {
@@ -30,13 +32,13 @@ describe('ProcessingScreen', () => {
     expect(screen.getByText('Processing...')).toBeInTheDocument();
   });
 
-  it('shows high-accuracy time remaining copy', () => {
+  it('shows accurate mode time remaining copy', () => {
     renderProcessing({ processingProgress: 10 });
     expect(screen.getByText(/Estimated time remaining: ~3 minutes/)).toBeInTheDocument();
   });
 
-  it('switches to standard accuracy timing when requested', () => {
-    renderProcessing({ isHighAccuracy: false });
+  it('switches to fast mode timing when requested', () => {
+    renderProcessing({ modeKey: 'fast', modeLabel: 'Fast mode' });
     expect(screen.getByText(/Estimated time remaining: ~1 minute/)).toBeInTheDocument();
   });
 

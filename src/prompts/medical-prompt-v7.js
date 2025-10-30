@@ -154,10 +154,21 @@ Respond with JSON only.`;
    * Post-process formatted text - minimal cleanup
    */
   postProcess(text) {
-    return text
-      .replace(/\n{3,}/g, '\n\n')  // Max 2 newlines
-      .replace(/([#]{3}\s+\w+)\n([^\n])/g, '$1\n\n$2')  // Space after headers
-      .trim();
+    if (!text) {
+      return '';
+    }
+
+    let normalized = text
+      .replace(/\r\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n');
+
+    // Ensure every header is followed by a blank line for readability
+    normalized = normalized.replace(/(###\s+[^\n]+)\n(?!\n)/g, '$1\n\n');
+
+    // Collapse repeated blank lines between non-header content to a single blank line
+    normalized = normalized.replace(/(^|\n)(?!###\s)([^\n]+)\n\n(?![#])/g, (_, prefix, line) => `${prefix}${line}\n`);
+
+    return normalized.trim();
   }
 }
 

@@ -191,6 +191,8 @@ whisper/models/
 # Transcript files
 *.txt
 *.pdf
+# Keep python bridge requirements tracked
+!python-bridge/requirements.txt
 
 # User data
 user-data/
