@@ -570,7 +570,7 @@ ipcMain.handle('reset-transcription-state', async () => {
 
 ipcMain.handle('get-confidence-score', async (event, { rawText, correctedText, corrections }) => {
   try {
-    const score = whisperTranscriber.getConfidenceScore(rawText, correctedText, corrections);
+    const score = sharedWhisperTranscriber.getConfidenceScore(rawText, correctedText, corrections);
     return { success: true, confidence: score };
   } catch (error) {
     console.error('Error calculating confidence score:', error);

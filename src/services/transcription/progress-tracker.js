@@ -103,9 +103,12 @@ class TranscriptionProgress {
      */
     nextStage(stageName = null) {
         if (this.currentStage > 0 && this.currentStage <= this.stages.length) {
-            this.completed.push(this.stages[this.currentStage - 1].id);
+            const previousStage = this.stages[this.currentStage - 1];
+            if (previousStage && !this.completed.includes(previousStage.id)) {
+                this.completed.push(previousStage.id);
+            }
         }
-        
+
         // Find stage by name if provided
         if (stageName) {
             const stageIndex = this.stages.findIndex(s => s.id === stageName);
@@ -115,7 +118,7 @@ class TranscriptionProgress {
         } else {
             this.currentStage++;
         }
-        
+
         this.stageStartTime = Date.now();
     }
 
@@ -123,16 +126,32 @@ class TranscriptionProgress {
      * Get current progress status
      */
     getStatus(actualProgress = null) {
-        if (this.currentStage === 0 || this.currentStage > this.stages.length) {
+        const stage = this.getActiveStage();
+        const stageProgress = this.calculateStageProgress(stage, actualProgress);
+        const progressMeta = this.buildProgressMeta(stage, stageProgress);
+
+        if (this.currentStage === 0) {
             return {
                 message: '',
                 subMessage: '',
                 stages: this.getStageList(),
-                isComplete: this.currentStage > this.stages.length
+                isComplete: false,
+                showSpinner: true,
+                progress: progressMeta
             };
         }
 
-        const stage = this.stages[this.currentStage - 1];
+        if (this.currentStage > this.stages.length) {
+            return {
+                message: '',
+                subMessage: '',
+                stages: this.getStageList(),
+                isComplete: true,
+                showSpinner: false,
+                progress: this.buildProgressMeta(this.getLastStage(), 1, { forceComplete: true })
+            };
+        }
+
         let message = stage.name;
         let subMessage = '';
 
@@ -140,7 +159,7 @@ class TranscriptionProgress {
         if (stage.id === 'transcribing') {
             const audioDurationFormatted = this.formatAudioDuration(this.audioDuration);
             message = `Processing ${audioDurationFormatted} of audio...`;
-            
+
             // Show time estimate range
             if (this.audioDuration > 30) {
                 const lowerTime = this.formatTime(this.lowerBound);
@@ -149,7 +168,7 @@ class TranscriptionProgress {
             } else {
                 subMessage = `Processing medical dictation...`;
             }
-            
+
             // If we have actual progress, show it subtly
             if (actualProgress && actualProgress > 0) {
                 const processedSeconds = Math.round(this.audioDuration * (actualProgress / 100));
@@ -160,12 +179,15 @@ class TranscriptionProgress {
             message = `${stage.name}...`;
         }
 
+        const showSpinner = !stage.deterministic && stageProgress === 0;
+
         return {
             message,
             subMessage,
             stages: this.getStageList(),
-            showSpinner: !stage.deterministic,
-            isComplete: false
+            showSpinner,
+            isComplete: false,
+            progress: progressMeta
         };
     }
 
@@ -209,7 +231,7 @@ class TranscriptionProgress {
 
         if (whisperStage && stageMap[whisperStage]) {
             const targetStage = stageMap[whisperStage];
-            
+
             // Move to the appropriate stage if needed
             if (this.stages[this.currentStage - 1]?.id !== targetStage) {
                 this.nextStage(targetStage);
@@ -225,15 +247,109 @@ class TranscriptionProgress {
     complete() {
         this.currentStage = this.stages.length + 1;
         this.completed = this.stages.map(s => s.id);
-        
+
         const totalTime = (Date.now() - this.overallStartTime) / 1000;
-        
+
         return {
             message: 'Transcript ready',
             subMessage: `Completed in ${this.formatTime(totalTime)}`,
             stages: this.getStageList(),
-            isComplete: true
+            isComplete: true,
+            showSpinner: false,
+            progress: this.buildProgressMeta(this.getLastStage(), 1, { forceComplete: true })
         };
+    }
+
+    /**
+     * Get the stage currently in progress
+     */
+    getActiveStage() {
+        if (this.currentStage === 0 || this.currentStage > this.stages.length) {
+            return null;
+        }
+        return this.stages[this.currentStage - 1];
+    }
+
+    /**
+     * Safely retrieve the final stage definition
+     */
+    getLastStage() {
+        return this.stages[this.stages.length - 1];
+    }
+
+    /**
+     * Calculate progress for the active stage
+     */
+    calculateStageProgress(stage, actualProgress) {
+        if (!stage) {
+            return 0;
+        }
+
+        if (typeof actualProgress === 'number' && Number.isFinite(actualProgress)) {
+            return this.clampPercent(actualProgress / 100);
+        }
+
+        if (stage.deterministic && this.stageStartTime) {
+            const elapsedSeconds = (Date.now() - this.stageStartTime) / 1000;
+            if (stage.duration <= 0) {
+                return 1;
+            }
+            return this.clampPercent(elapsedSeconds / stage.duration);
+        }
+
+        return 0;
+    }
+
+    /**
+     * Build unified progress metadata for renderer consumption
+     */
+    buildProgressMeta(stage, stageProgress, options = {}) {
+        const totalEstimated = this.getTotalExpectedDuration();
+        const completedDuration = this.completed.reduce((sum, stageId) => {
+            const completedStage = this.stages.find(s => s.id === stageId);
+            return completedStage ? sum + completedStage.duration : sum;
+        }, 0);
+
+        const activeContribution = stage ? stage.duration * stageProgress : 0;
+        const elapsedSeconds = Math.max(0, Math.round((Date.now() - this.overallStartTime) / 1000));
+        const rawPercent = totalEstimated > 0
+            ? ((completedDuration + activeContribution) / totalEstimated) * 100
+            : 0;
+
+        const clampedPercent = options.forceComplete ? 100 : this.clampPercent(rawPercent / 100) * 100;
+        const roundedPercent = Number(clampedPercent.toFixed(1));
+
+        const remainingSeconds = options.forceComplete
+            ? 0
+            : Math.max(0, Math.round(totalEstimated - (completedDuration + activeContribution)));
+
+        return {
+            stageId: stage ? stage.id : null,
+            stagePercent: Number((stageProgress * 100).toFixed(1)),
+            percent: roundedPercent,
+            elapsedSeconds,
+            estimatedTotalSeconds: Math.round(totalEstimated),
+            estimatedRemainingSeconds: remainingSeconds,
+            lowerBoundSeconds: this.lowerBound,
+            upperBoundSeconds: this.upperBound
+        };
+    }
+
+    /**
+     * Aggregate total expected duration across stages
+     */
+    getTotalExpectedDuration() {
+        return this.stages.reduce((sum, stage) => sum + stage.duration, 0);
+    }
+
+    /**
+     * Clamp a fractional value between 0 and 1
+     */
+    clampPercent(value) {
+        if (!Number.isFinite(value)) {
+            return 0;
+        }
+        return Math.min(1, Math.max(0, value));
     }
 }
 
