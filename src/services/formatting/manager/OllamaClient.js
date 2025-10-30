@@ -3,6 +3,9 @@ class OllamaClient {
     this.baseUrl = options.baseUrl || 'http://localhost:11434';
     this.fetchImpl = options.fetchImpl || global.fetch || null;
     this.healthTimeoutMs = options.healthTimeoutMs || 3000;
+    this.modelCacheTtlMs = options.modelCacheTtlMs || 60_000;
+    this.cachedModels = null;
+    this.cachedModelsAt = 0;
   }
 
   async ensureHealthy() {
@@ -83,6 +86,43 @@ class OllamaClient {
     const { default: nodeFetch } = await import('node-fetch');
     this.fetchImpl = nodeFetch;
     return nodeFetch;
+  }
+
+  async ensureModel(model) {
+    if (!model) {
+      return;
+    }
+
+    const models = await this.listInstalledModels();
+    if (!models.includes(model)) {
+      throw new Error(
+        `Ollama model "${model}" is not installed. Run \`ollama pull ${model}\` to make it available.`
+      );
+    }
+  }
+
+  async listInstalledModels(force = false) {
+    const now = Date.now();
+    if (!force && Array.isArray(this.cachedModels) && now - this.cachedModelsAt < this.modelCacheTtlMs) {
+      return this.cachedModels;
+    }
+
+    const fetch = await this.resolveFetch();
+    const response = await fetch(new URL('/api/tags', this.baseUrl), { method: 'GET' });
+    if (!response.ok) {
+      throw new Error(`Failed to list Ollama models: HTTP ${response.status}`);
+    }
+
+    const body = await response.json().catch(() => ({}));
+    const models = Array.isArray(body.models)
+      ? body.models
+          .map((entry) => entry?.name || entry?.model || entry?.digest)
+          .filter(Boolean)
+      : [];
+
+    this.cachedModels = models;
+    this.cachedModelsAt = now;
+    return models;
   }
 }
 

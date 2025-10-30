@@ -8,6 +8,13 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState('recording'); // 'recording', 'processing', 'transcript'
   const defaultModes = [
     {
+      key: 'auto',
+      label: 'Smart mode',
+      description: 'Automatically switches between Fast and Accurate for you.',
+      details: ['Checks audio length', 'Respects device memory headroom'],
+      badge: 'Recommended',
+    },
+    {
       key: 'fast',
       label: 'Fast mode',
       description: 'Whisper.cpp tuned for speed with light formatting.',
@@ -21,7 +28,9 @@ export default function App() {
     },
   ];
   const [availableModes, setAvailableModes] = useState(defaultModes);
-  const [selectedMode, setSelectedMode] = useState('accurate');
+  const [selectedMode, setSelectedMode] = useState('auto');
+  const [resolvedMode, setResolvedMode] = useState<string | null>(null);
+  const [modeDecision, setModeDecision] = useState<Record<string, unknown> | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -37,8 +46,12 @@ export default function App() {
         const response = await listTranscriptionModes();
         if (!cancelled && response.success && response.modes && response.modes.length > 0) {
           setAvailableModes(response.modes);
-          if (!response.modes.some((mode) => mode.key === selectedMode)) {
-            setSelectedMode(response.modes[0].key);
+          const hasSelected = response.modes.some((mode) => mode.key === selectedMode);
+          if (!hasSelected) {
+            const fallbackMode = response.modes.find((mode) => mode.key === 'auto') || response.modes[0];
+            if (fallbackMode) {
+              setSelectedMode(fallbackMode.key);
+            }
           }
         }
       } catch (error) {
@@ -58,8 +71,9 @@ export default function App() {
     correctionsCount: 0,
     corrections: [] as {original: string, corrected: string, context: string}[],
     medications: [] as string[],
-    mode: 'accurate',
+    mode: 'auto',
     formattingMetadata: undefined as Record<string, unknown> | undefined,
+    modeDecision: undefined as Record<string, unknown> | undefined,
   });
   const handleStartRecording = () => {
     setIsRecording(true);
@@ -73,11 +87,20 @@ export default function App() {
   const handleProcessingStart = () => {
     setProcessingStep('audio');
     setProcessingProgress(0);
+    setResolvedMode(null);
+    setModeDecision(null);
   };
 
   const handleProcessingProgress = (step: string, progress: number) => {
     setProcessingStep(step);
     setProcessingProgress(progress);
+  };
+
+  const handleModeResolved = (modeKey: string, decision?: Record<string, unknown>) => {
+    setResolvedMode(modeKey);
+    if (decision) {
+      setModeDecision(decision);
+    }
   };
 
   const handleTranscriptionComplete = (transcriptData: any) => {
@@ -117,13 +140,18 @@ export default function App() {
         if (transcriptData.metadata.formatting) {
           metadata.formattingMetadata = transcriptData.metadata.formatting as Record<string, unknown>;
         }
+        if (transcriptData.metadata.modeDecision) {
+          setModeDecision(transcriptData.metadata.modeDecision as Record<string, unknown>);
+          metadata.modeDecision = transcriptData.metadata.modeDecision as Record<string, unknown>;
+        }
       }
     }
 
+    setResolvedMode(modeUsed);
     metadata.mode = modeUsed;
     setTranscript(transcriptText);
     setRecordingMetadata(metadata);
-    if (modeUsed && modeUsed !== selectedMode) {
+    if (modeUsed && modeUsed !== selectedMode && selectedMode !== 'auto') {
       setSelectedMode(modeUsed);
     }
     setCurrentScreen('transcript');
@@ -132,13 +160,18 @@ export default function App() {
     setRecordingTime(0);
     setTranscript('');
     setCurrentScreen('recording');
+    setResolvedMode(null);
+    setModeDecision(null);
   };
   const activeMode =
     availableModes.find((mode) => mode.key === recordingMetadata.mode) ||
+    availableModes.find((mode) => mode.key === resolvedMode) ||
     availableModes.find((mode) => mode.key === selectedMode) ||
     availableModes[0];
   const processingMode =
-    availableModes.find((mode) => mode.key === selectedMode) || availableModes[0];
+    availableModes.find((mode) => mode.key === resolvedMode) ||
+    availableModes.find((mode) => mode.key === selectedMode) ||
+    availableModes[0];
   return <div className="flex flex-col min-h-screen bg-stone-50" style={{
     backgroundImage: "url('https://uploadthingy.s3.us-west-1.amazonaws.com/4hJdzLGeSwniXj4zjWiZkP/image.png')",
     backgroundSize: '30px',
@@ -149,8 +182,8 @@ export default function App() {
       <Header />
       <main className="flex-1 p-4 md:p-8 max-w-5xl mx-auto w-full">
         <div className="transition-all duration-500 ease-in-out">
-          {currentScreen === 'recording' && <RecordingScreen availableModes={availableModes} selectedMode={selectedMode} onSelectMode={setSelectedMode} isRecording={isRecording} recordingTime={recordingTime} setRecordingTime={setRecordingTime} onStartRecording={handleStartRecording} onStopRecording={handleStopRecording} onTranscriptionComplete={handleTranscriptionComplete} onProcessingStart={handleProcessingStart} onProcessingProgress={handleProcessingProgress} />}
-          {currentScreen === 'processing' && <ProcessingScreen modeKey={processingMode?.key || selectedMode} modeLabel={processingMode?.label || ''} processingStep={processingStep} processingProgress={processingProgress} minutesProcessed={processingProgress / 100 * (recordingTime / 60)} totalMinutes={recordingTime / 60} />}
+          {currentScreen === 'recording' && <RecordingScreen availableModes={availableModes} selectedMode={selectedMode} onSelectMode={setSelectedMode} isRecording={isRecording} recordingTime={recordingTime} setRecordingTime={setRecordingTime} onStartRecording={handleStartRecording} onStopRecording={handleStopRecording} onTranscriptionComplete={handleTranscriptionComplete} onProcessingStart={handleProcessingStart} onProcessingProgress={handleProcessingProgress} onModeResolved={handleModeResolved} />}
+          {currentScreen === 'processing' && <ProcessingScreen modeKey={processingMode?.key || selectedMode} modeLabel={processingMode?.label || ''} processingStep={processingStep} processingProgress={processingProgress} minutesProcessed={processingProgress / 100 * (recordingTime / 60)} totalMinutes={recordingTime / 60} modeDecision={modeDecision} />}
           {currentScreen === 'transcript' && <TranscriptScreen transcript={transcript} setTranscript={setTranscript} onNewRecording={handleNewRecording} patientName={patientName} modeKey={recordingMetadata.mode} modeLabel={activeMode?.label || ''} recordingMetadata={recordingMetadata} />}
         </div>
       </main>

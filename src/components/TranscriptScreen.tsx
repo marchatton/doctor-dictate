@@ -20,6 +20,7 @@ interface RecordingMetadata {
   medications: string[];
   mode?: string;
   formattingMetadata?: Record<string, unknown>;
+  modeDecision?: Record<string, unknown>;
 }
 
 interface TranscriptScreenProps {
@@ -124,6 +125,29 @@ export function TranscriptScreen({
     setShowConfirmModal(false);
     onNewRecording();
   };
+  const decision = computedMetadata.modeDecision as
+    | { reason?: string; heuristics?: { audio?: { durationSeconds?: number } } }
+    | undefined;
+  const decisionReasonMap: Record<string, string> = {
+    'long-duration': 'Chose Fast mode for a long recording.',
+    'large-file': 'Fast mode used due to large audio file.',
+    'duration-memory': 'Fast mode used to preserve memory on long audio.',
+    'limited-memory': 'Fast mode used because system memory is limited.',
+    'low-free-memory': 'Fast mode used to avoid swapping.',
+    'short-audio': 'Accurate mode selected for short audio.',
+  };
+  const decisionText = decision?.reason ? decisionReasonMap[decision.reason] || decision.reason : null;
+  const decisionMinutes = decision?.heuristics?.audio?.durationSeconds
+    ? Math.round((decision.heuristics.audio.durationSeconds / 60) * 10) / 10
+    : null;
+
+  const formattingMetadata = computedMetadata.formattingMetadata as
+    | { cacheHits?: number; cacheMisses?: number }
+    | undefined;
+  const cacheHits = formattingMetadata?.cacheHits ?? 0;
+  const cacheMisses = formattingMetadata?.cacheMisses ?? 0;
+  const cacheTotal = cacheHits + cacheMisses;
+  const cacheRate = cacheTotal > 0 ? Math.round((cacheHits / cacheTotal) * 100) : null;
   return <div className="bg-white rounded-xl shadow-xl overflow-hidden transition-all duration-300">
       <Modal isOpen={showConfirmModal} onClose={() => setShowConfirmModal(false)} onConfirm={handleConfirmNewRecording} title="Discard current transcript?" message="Starting a new recording will discard your current transcript. This action cannot be undone." cancelText="Go back" confirmText="Discard notes and create new recording" />
       <div className="p-6 border-b border-stone-200">
@@ -182,6 +206,13 @@ export function TranscriptScreen({
                   {modeLabel || modeKey}
                 </span>
               </div>
+              {decisionText ? (
+                <div className="p-2 bg-white rounded-md text-xs text-stone-600">
+                  <span className="text-stone-500 block">Smart selection:</span>
+                  <span className="font-medium text-stone-800">{decisionText}</span>
+                  {decisionMinutes ? <span className="block mt-0.5 text-stone-500">Detected duration: {decisionMinutes} min</span> : null}
+                </div>
+              ) : null}
             </div>
           </div>
           <div>
@@ -189,6 +220,17 @@ export function TranscriptScreen({
               Processing
             </h3>
             <div className="space-y-2 text-sm">
+              {cacheTotal > 0 ? (
+                <div className="p-2 bg-white rounded-md">
+                  <div className="flex justify-between items-center">
+                    <span className="text-stone-500">Formatting cache:</span>
+                    <span className="font-medium text-stone-800">{cacheHits} hits · {cacheMisses} misses</span>
+                  </div>
+                  {cacheRate !== null ? (
+                    <div className="text-xs text-stone-500 mt-0.5">Hit rate: {cacheRate}%</div>
+                  ) : null}
+                </div>
+              ) : null}
               {/* Medical Terms Dropdown */}
               <div className="p-2 bg-white rounded-md cursor-pointer" onClick={() => setShowMedicalTerms(!showMedicalTerms)}>
                 <div className="flex justify-between items-center">

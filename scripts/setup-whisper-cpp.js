@@ -20,12 +20,11 @@ function downloadFile(url, destination) {
   return new Promise((resolve, reject) => {
     console.log(`[setup-whisper-cpp] downloading model from ${url}`);
     const file = fs.createWriteStream(destination);
-    https
-      .get(url, (response) => {
-        if (response.statusCode !== 200) {
-          reject(new Error(`Request failed with status ${response.statusCode}`));
-          return;
-        }
+    const request = https.get(url, (response) => {
+      if (response.statusCode !== 200) {
+        reject(new Error(`Request failed with status ${response.statusCode}`));
+        return;
+      }
 
         response.pipe(file);
         file.on('finish', () => {
@@ -34,14 +33,26 @@ function downloadFile(url, destination) {
             resolve();
           });
         });
-      })
-      .on('error', (error) => {
-        fs.unlink(destination, () => reject(error));
       });
+
+    request.on('timeout', () => {
+      request.destroy(new Error('Request timed out'));
+    });
+
+    request.on('error', (error) => {
+      fs.unlink(destination, () => reject(error));
+    });
+
+    request.setTimeout(30_000);
   });
 }
 
 async function main() {
+  if (process.env.DD_ALLOW_MODEL_DOWNLOADS !== '1') {
+    console.error('[setup-whisper-cpp] Downloads disabled. Set DD_ALLOW_MODEL_DOWNLOADS=1 to proceed.');
+    process.exitCode = 1;
+    return;
+  }
   ensureDirectory(TARGET_DIR);
 
   if (fs.existsSync(TARGET_FILE)) {
@@ -50,10 +61,32 @@ async function main() {
   }
 
   try {
-    await downloadFile(MODEL_URL, TARGET_FILE);
+    let attempts = 0;
+    let lastError = null;
+    while (attempts < 3) {
+      try {
+        await downloadFile(MODEL_URL, TARGET_FILE);
+        lastError = null;
+        break;
+      } catch (error) {
+        attempts += 1;
+        lastError = error;
+        console.warn(`[setup-whisper-cpp] attempt ${attempts} failed: ${error.message}`);
+        if (attempts < 3) {
+          console.warn('[setup-whisper-cpp] retrying download...');
+        }
+      }
+    }
+
+    if (lastError) {
+      throw lastError;
+    }
     console.log('[setup-whisper-cpp] whisper.cpp base.en model ready');
   } catch (error) {
     console.error('[setup-whisper-cpp] failed to download model:', error.message);
+    if (fs.existsSync(TARGET_FILE)) {
+      fs.unlinkSync(TARGET_FILE);
+    }
     console.log('You can download the file manually and place it at', TARGET_FILE);
   }
 }

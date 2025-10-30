@@ -35,6 +35,7 @@ interface RecordingScreenProps {
   onTranscriptionComplete: (transcript: any) => void;
   onProcessingStart: () => void;
   onProcessingProgress: (step: string, progress: number) => void;
+  onModeResolved: (mode: string, decision?: Record<string, unknown>) => void;
 }
 
 export function RecordingScreen({
@@ -48,7 +49,8 @@ export function RecordingScreen({
   onStopRecording,
   onTranscriptionComplete,
   onProcessingStart,
-  onProcessingProgress
+  onProcessingProgress,
+  onModeResolved,
 }: RecordingScreenProps) {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
@@ -60,12 +62,14 @@ export function RecordingScreen({
   const onTranscriptionCompleteRef = useRef(onTranscriptionComplete);
   const onProcessingProgressRef = useRef(onProcessingProgress);
   const onProcessingStartRef = useRef(onProcessingStart);
+  const onModeResolvedRef = useRef(onModeResolved);
   
   // Update refs when props change
   useEffect(() => {
     onTranscriptionCompleteRef.current = onTranscriptionComplete;
     onProcessingProgressRef.current = onProcessingProgress;
     onProcessingStartRef.current = onProcessingStart;
+    onModeResolvedRef.current = onModeResolved;
   });
   // Initialize media recorder - only once on component mount
   useEffect(() => {
@@ -161,6 +165,9 @@ export function RecordingScreen({
           // Set up progress listener to map backend progress to UI steps
           window.electronAPI?.onTranscriptionProgress((progress) => {
             console.log('Transcription progress:', progress);
+            if (progress.mode) {
+              onModeResolvedRef.current?.(progress.mode, progress.decision);
+            }
             if (progress.message) {
               if (progress.message.includes('Preparing audio file')) {
                 onProcessingProgressRef.current('audio', 50);

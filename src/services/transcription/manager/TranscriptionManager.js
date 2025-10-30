@@ -2,6 +2,7 @@ const { FastMode } = require('./modes/FastMode');
 const { AccurateMode } = require('./modes/AccurateMode');
 const { MemoryMonitor } = require('./utils/MemoryMonitor');
 const { ProgressReporter } = require('./utils/ProgressReporter');
+const { SmartModeSelector } = require('./utils/SmartModeSelector');
 const { AudioChunker } = require('./processors/AudioChunker');
 const { VADProcessor } = require('./processors/VADProcessor');
 const { ResultMerger } = require('./processors/ResultMerger');
@@ -14,6 +15,7 @@ class TranscriptionManager {
       processors = {},
       progressReporterFactory,
       formattingManager,
+      modeSelector,
     } = options;
 
     this.modes = modes instanceof Map ? modes : this.createDefaultModes();
@@ -24,6 +26,14 @@ class TranscriptionManager {
     this.progressReporterFactory =
       progressReporterFactory || ((context) => new ProgressReporter(context));
     this.formattingManager = formattingManager || null;
+    this.modeSelector =
+      modeSelector ||
+      new SmartModeSelector({
+        modes: this.modes,
+      });
+    if (this.modeSelector && typeof this.modeSelector === 'object') {
+      this.modeSelector.modes = this.modes;
+    }
   }
 
   createDefaultModes() {
@@ -36,12 +46,22 @@ class TranscriptionManager {
   }
 
   listModes() {
-    return Array.from(this.modes.values()).map((mode) => ({
+    const autoMode = {
+      key: 'auto',
+      label: 'Smart (Auto)',
+      description: 'Automatically selects Fast or Accurate based on audio length and device headroom.',
+      badge: 'Recommended',
+      config: { heuristics: this.modeSelector?.thresholds },
+    };
+
+    const configuredModes = Array.from(this.modes.values()).map((mode) => ({
       key: mode.key,
       label: mode.label,
       description: mode.description,
       config: mode.config,
     }));
+
+    return [autoMode, ...configuredModes];
   }
 
   async transcribe({
@@ -49,17 +69,29 @@ class TranscriptionManager {
     mode = 'accurate',
     signal,
     progressReporter: providedReporter,
+    metadata = {},
   }) {
     if (!audioPath) {
       throw new Error('audioPath is required for transcription');
     }
 
-    const selectedMode = this.resolveMode(mode);
+    const { selectedMode, decision } = await this.resolveMode(mode, {
+      audioPath,
+      metadata,
+    });
     const { config } = selectedMode;
 
     const progressReporter =
       providedReporter ||
-      this.progressReporterFactory({ audioPath, mode: selectedMode.key });
+      this.progressReporterFactory({
+        audioPath,
+        mode: selectedMode.key,
+        decision,
+      });
+
+    if (progressReporter && typeof progressReporter.updateContext === 'function') {
+      progressReporter.updateContext({ mode: selectedMode.key, decision });
+    }
 
     const engine = selectedMode.createEngine();
 
@@ -73,6 +105,11 @@ class TranscriptionManager {
     const startedAt = Date.now();
 
     try {
+      progressReporter.start('mode-selection', {
+        chosenMode: selectedMode.key,
+        reason: decision?.reason,
+      });
+
       if (typeof engine.initialize === 'function') {
         await engine.initialize(config);
       }
@@ -149,6 +186,7 @@ class TranscriptionManager {
         mode: selectedMode.key,
         config,
         startedAt,
+        decision,
       });
 
       progressReporter.complete(result);
@@ -168,9 +206,13 @@ class TranscriptionManager {
     }
   }
 
-  resolveMode(requestedMode) {
-    if (this.modes.has(requestedMode)) {
-      return this.modes.get(requestedMode);
+  async resolveMode(requestedMode, context = {}) {
+    if (this.modes.has(requestedMode) && requestedMode !== 'auto') {
+      const explicitMode = this.modes.get(requestedMode);
+      return {
+        selectedMode: explicitMode,
+        decision: { mode: explicitMode.key, reason: 'explicit' },
+      };
     }
 
     const fallback = this.modes.get('accurate') || this.modes.values().next().value;
@@ -178,7 +220,25 @@ class TranscriptionManager {
       throw new Error('No transcription modes configured');
     }
 
-    return fallback;
+    if (!this.modeSelector) {
+      return {
+        selectedMode: fallback,
+        decision: { mode: fallback.key, reason: 'fallback' },
+      };
+    }
+
+    const decision = await this.modeSelector.decide({
+      requestedMode,
+      audioPath: context.audioPath,
+      metadata: context.metadata,
+      availableModes: this.modes,
+    });
+
+    const resolvedMode = this.modes.get(decision.mode) || fallback;
+    return {
+      selectedMode: resolvedMode,
+      decision: { ...decision, mode: resolvedMode.key },
+    };
   }
 
   async processChunks({
@@ -249,7 +309,7 @@ class TranscriptionManager {
     }
   }
 
-  attachMetadata(result, { mode, config, startedAt }) {
+  attachMetadata(result, { mode, config, startedAt, decision }) {
     const now = Date.now();
     const processingTimeMs = startedAt ? now - startedAt : undefined;
     const metadata = {
@@ -259,6 +319,7 @@ class TranscriptionManager {
       processingTimeMs,
       peakMemoryMB: this.memoryMonitor.getPeakUsage(),
       formatting: result?.formattingMetadata,
+      modeDecision: decision,
     };
 
     return {

@@ -26,6 +26,9 @@ class FormattingManager {
     const segments = this.splitter.split(text, config);
 
     await this.ollamaClient.ensureHealthy();
+    if (config?.model) {
+      await this.ollamaClient.ensureModel(config.model);
+    }
 
     const formattedSegments = [];
     let cacheHits = 0;
@@ -92,6 +95,7 @@ class FormattingManager {
       metadata: {
         mode,
         model: config.model,
+        profile: config.profile,
         cacheHits,
         cacheMisses,
       },

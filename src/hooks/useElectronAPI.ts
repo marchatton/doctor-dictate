@@ -16,7 +16,14 @@ declare global {
       }>;
       listTranscriptionModes: () => Promise<{
         success: boolean;
-        modes?: Array<{ key: string; label: string; description?: string; config?: Record<string, unknown> }>;
+        modes?: Array<{
+          key: string;
+          label: string;
+          description?: string;
+          details?: string[];
+          badge?: string;
+          config?: Record<string, unknown>;
+        }>;
         error?: string;
       }>;
       setWhisperModel: (model: string) => Promise<{success: boolean}>;

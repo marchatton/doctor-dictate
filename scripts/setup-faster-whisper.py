@@ -15,20 +15,29 @@ FALLBACK_REQUIREMENTS = [
 
 def run(cmd, env=None):
     print(f"[setup-faster-whisper] $ {' '.join(cmd)}")
-    subprocess.check_call(cmd, env=env)
+    try:
+        subprocess.check_call(cmd, env=env)
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError(f"command failed with exit code {error.returncode}") from error
 
 
 def ensure_venv(path: str):
+    if not os.path.isdir('python-bridge'):
+        raise RuntimeError('python-bridge directory missing. Run from repo root.')
     builder = venv.EnvBuilder(with_pip=True)
     if not os.path.exists(path):
         print(f"[setup-faster-whisper] creating virtualenv at {path}")
-        builder.create(path)
+        try:
+            builder.create(path)
+        except Exception as error:  # pylint: disable=broad-except
+            raise RuntimeError('failed to create virtualenv; ensure Python 3.8+ is installed') from error
     return path
 
 
 def install_dependencies(venv_path: str):
-    python_bin = os.path.join(venv_path, 'bin', 'python')
-    pip_bin = os.path.join(venv_path, 'bin', 'pip')
+    bin_dir = 'Scripts' if os.name == 'nt' else 'bin'
+    python_bin = os.path.join(venv_path, bin_dir, 'python.exe' if os.name == 'nt' else 'python')
+    pip_bin = os.path.join(venv_path, bin_dir, 'pip.exe' if os.name == 'nt' else 'pip')
 
     if not os.path.exists(pip_bin):
         raise RuntimeError('pip not found in virtualenv, ensure Python 3.8+ is installed')
@@ -61,9 +70,6 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except subprocess.CalledProcessError as exc:
-        print('[setup-faster-whisper] command failed:', exc, file=sys.stderr)
-        sys.exit(exc.returncode)
     except Exception as exc:  # pylint: disable=broad-except
         print('[setup-faster-whisper] error:', exc, file=sys.stderr)
         sys.exit(1)

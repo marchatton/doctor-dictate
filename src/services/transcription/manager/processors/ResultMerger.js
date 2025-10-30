@@ -1,4 +1,4 @@
-const { AudioProcessor } = require('../../../services/audio/processor.js');
+const { AudioProcessor } = require('../../../audio/processor.js');
 
 class ResultMerger {
   constructor(options = {}) {

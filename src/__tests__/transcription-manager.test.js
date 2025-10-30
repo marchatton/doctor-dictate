@@ -9,6 +9,7 @@ describe('TranscriptionManager', () => {
   let mockChunker;
   let mockVadProcessor;
   let mockResultMerger;
+  let mockModeSelector;
   let engine;
 
   beforeEach(() => {
@@ -23,7 +24,7 @@ describe('TranscriptionManager', () => {
       requestTrim: jest.fn(),
     };
 
-    jest.doMock('../main/transcription/utils/MemoryMonitor', () => ({
+    jest.doMock('../services/transcription/manager/utils/MemoryMonitor', () => ({
       MemoryMonitor: jest.fn(() => mockMemoryMonitor),
     }));
 
@@ -39,12 +40,20 @@ describe('TranscriptionManager', () => {
       return reporter;
     });
 
-    jest.doMock('../main/transcription/utils/ProgressReporter', () => ({
+    jest.doMock('../services/transcription/manager/utils/ProgressReporter', () => ({
       ProgressReporter: mockProgressReporterFactory,
     }));
 
-    ({ TranscriptionManager } = require('../main/transcription/TranscriptionManager'));
-    ({ FastMode } = require('../main/transcription/modes/FastMode'));
+    mockModeSelector = {
+      decide: jest.fn(),
+    };
+
+    jest.doMock('../services/transcription/manager/utils/SmartModeSelector', () => ({
+      SmartModeSelector: jest.fn(() => mockModeSelector),
+    }));
+
+    ({ TranscriptionManager } = require('../services/transcription/manager/TranscriptionManager'));
+    ({ FastMode } = require('../services/transcription/manager/modes/FastMode'));
 
     mockChunker = {
       segment: jest.fn(),
@@ -153,5 +162,57 @@ describe('TranscriptionManager', () => {
     expect(progressInstances[0].chunkProgress).toHaveBeenCalledTimes(2);
     expect(progressInstances[0].complete).toHaveBeenCalledWith(result);
     expect(mockMemoryMonitor.stopMonitoring).toHaveBeenCalled();
+  });
+
+  it('delegates auto mode to smart selector and annotates decision', async () => {
+    const fastMode = new FastMode({
+      engineFactory: () => engine,
+    });
+
+    const manager = new TranscriptionManager({
+      modes: new Map([[fastMode.key, fastMode]]),
+      processors: {
+        audioChunker: mockChunker,
+        vadProcessor: mockVadProcessor,
+        resultMerger: mockResultMerger,
+      },
+    });
+
+    mockModeSelector.decide.mockResolvedValue({
+      mode: 'fast',
+      reason: 'long-duration',
+      heuristics: { audio: { durationSeconds: 2000 } },
+    });
+
+    mockChunker.segment.mockResolvedValue({
+      processedPath: '/tmp/preprocessed.wav',
+      chunks: [],
+      duration: 2000,
+    });
+
+    mockResultMerger.merge.mockReturnValue({
+      text: 'merged',
+      segments: [],
+      duration: 2000,
+    });
+
+    const result = await manager.transcribe({
+      audioPath: path.join(__dirname, 'fixtures', 'auto.wav'),
+      mode: 'auto',
+    });
+
+    expect(mockModeSelector.decide).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestedMode: 'auto',
+        audioPath: expect.stringContaining('auto.wav'),
+      })
+    );
+    expect(result.metadata.mode).toBe('fast');
+    expect(result.metadata.modeDecision).toEqual(
+      expect.objectContaining({
+        mode: 'fast',
+        reason: 'long-duration',
+      })
+    );
   });
 });

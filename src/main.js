@@ -3,15 +3,15 @@ const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const { WhisperTranscriber } = require('./services/transcription/whisper.js');
-const { TranscriptionManager } = require('./main/transcription/TranscriptionManager');
-const { FastMode } = require('./main/transcription/modes/FastMode');
-const { AccurateMode } = require('./main/transcription/modes/AccurateMode');
-const { ProgressReporter } = require('./main/transcription/utils/ProgressReporter');
-const { WhisperCppEngine } = require('./main/transcription/engines/WhisperCppEngine');
-const { FasterWhisperBridge } = require('./main/transcription/engines/FasterWhisperBridge');
-const { FormattingManager } = require('./main/formatting/FormattingManager');
-const { ModelValidator } = require('./main/models/ModelValidator');
-const { ModelDownloader } = require('./main/models/ModelDownloader');
+const { TranscriptionManager } = require('./services/transcription/manager/TranscriptionManager');
+const { FastMode } = require('./services/transcription/manager/modes/FastMode');
+const { AccurateMode } = require('./services/transcription/manager/modes/AccurateMode');
+const { ProgressReporter } = require('./services/transcription/manager/utils/ProgressReporter');
+const { WhisperCppEngine } = require('./services/transcription/manager/engines/WhisperCppEngine');
+const { FasterWhisperBridge } = require('./services/transcription/manager/engines/FasterWhisperBridge');
+const { FormattingManager } = require('./services/formatting/manager/FormattingManager');
+const { ModelValidator } = require('./services/models/ModelValidator');
+const { ModelDownloader } = require('./services/models/ModelDownloader');
 
 // Keep a global reference of the window object
 let mainWindow;
@@ -466,42 +466,49 @@ ipcMain.handle('transcribe-audio', async (event, payload) => {
     return { success: false, error: 'Audio path is required' };
   }
 
+  let emittedMode = mode;
   const progressReporter = new ProgressReporter(
     { audioPath, mode },
     {
       emitter: {
         emit: (eventName, data) => {
+          emittedMode = data?.context?.mode || emittedMode;
+          const decision = data?.context?.decision;
           switch (eventName) {
             case 'stage':
               event.sender.send('transcription-progress', {
-                mode,
+                mode: emittedMode,
                 stage: data.stage,
                 status: data.status,
                 percent: data.percent,
                 message: data.message,
+                decision,
               });
               break;
             case 'chunk':
               event.sender.send('transcription-progress', {
-                mode,
+                mode: emittedMode,
                 stage: 'chunk',
                 current: data.current,
                 total: data.total,
                 estimatedMsRemaining: data.estimatedMsRemaining,
+                decision,
               });
               break;
             case 'error':
               event.sender.send('transcription-progress', {
-                mode,
+                mode: emittedMode,
                 stage: 'error',
                 error: data.error?.message || String(data.error),
+                decision,
               });
               break;
             case 'complete':
               event.sender.send('transcription-progress', {
-                mode,
+                mode: emittedMode,
                 stage: 'complete',
                 metadata: data.result?.metadata,
+                decision: data.result?.metadata?.modeDecision || decision,
               });
               break;
             default:
@@ -516,7 +523,7 @@ ipcMain.handle('transcribe-audio', async (event, payload) => {
     console.log('🔍 MAIN IPC - Starting transcription for:', audioPath, 'mode:', mode);
     const result = await transcriptionManager.transcribe({
       audioPath,
-      mode,
+      mode: emittedMode,
       progressReporter,
     });
 

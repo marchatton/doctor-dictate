@@ -5,7 +5,7 @@ import App from '../App';
 
 // Mock the components to focus on App logic
 jest.mock('../components/RecordingScreen', () => ({
-  RecordingScreen: ({ onStartRecording, onStopRecording, onTranscriptionComplete, onProcessingStart, onProcessingProgress }: any) => (
+  RecordingScreen: ({ onStartRecording, onStopRecording, onTranscriptionComplete, onProcessingStart, onProcessingProgress, onModeResolved }: any) => (
     <div data-testid="recording-screen">
       <button onClick={onStartRecording}>Start Recording</button>
       <button onClick={onStopRecording}>Stop Recording</button>
@@ -13,6 +13,7 @@ jest.mock('../components/RecordingScreen', () => ({
         onProcessingStart();
         onProcessingProgress('audio', 100);
         onProcessingProgress('transcribe', 100);
+        onModeResolved('fast', { reason: 'long-duration' });
         onTranscriptionComplete('Test transcript');
       }}>
         Complete Processing

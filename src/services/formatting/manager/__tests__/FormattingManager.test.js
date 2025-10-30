@@ -32,6 +32,7 @@ describe('FormattingManager', () => {
         };
       }),
       ensureHealthy: jest.fn(() => Promise.resolve()),
+      ensureModel: jest.fn(() => Promise.resolve()),
     };
 
     cache = {
@@ -61,6 +62,7 @@ describe('FormattingManager', () => {
 
     expect(ollamaClient.ensureHealthy).toHaveBeenCalled();
     expect(promptManager.getModeConfig).toHaveBeenCalledWith('accurate');
+    expect(ollamaClient.ensureModel).toHaveBeenCalledWith('tinyllama');
     expect(promptManager.buildPrompt).toHaveBeenCalledTimes(2);
     expect(ollamaClient.generate).toHaveBeenCalledTimes(2);
     expect(result.formatted.replace(/\s+/g, ' ').trim()).toBe(
@@ -115,5 +117,35 @@ describe('FormattingManager', () => {
     expect(ollamaClient.generate).not.toHaveBeenCalled();
     expect(result.formatted).toBe('');
     expect(result.segments).toEqual([]);
+  });
+
+  it('propagates qwen profile metadata when present', async () => {
+    promptManager.getModeConfig.mockReturnValue({
+      maxSegmentLength: 1200,
+      overlapSentences: 2,
+      model: 'qwen2.5:1.5b',
+      timeout: 45000,
+      options: {},
+      profile: {
+        model: 'qwen2.5:1.5b',
+        label: 'Qwen2.5 1.5B',
+      },
+    });
+
+    const manager = new FormattingManager({
+      promptManager,
+      ollamaClient,
+      cache,
+      splitter: {
+        split: jest.fn(() => [{ id: 'seg-0', text: 'content', start: 0, end: 7 }]),
+      },
+    });
+
+    const result = await manager.format({ transcript: 'content', mode: 'accurate' });
+
+    expect(ollamaClient.ensureModel).toHaveBeenCalledWith('qwen2.5:1.5b');
+    expect(result.metadata.profile).toEqual(
+      expect.objectContaining({ model: 'qwen2.5:1.5b', label: 'Qwen2.5 1.5B' })
+    );
   });
 });

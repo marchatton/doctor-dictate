@@ -8,6 +8,7 @@ class FasterWhisperBridge {
     this.transcriber = options.transcriber || null;
     this.logger = options.logger || console;
     this.pythonProcess = null;
+    this.bridgeReady = null;
     this.httpClient = options.httpClient || null;
     this.port = options.port || 8765;
     this.host = options.host || '127.0.0.1';
@@ -57,6 +58,10 @@ class FasterWhisperBridge {
       return;
     }
 
+    if (this.bridgeReady) {
+      return this.bridgeReady;
+    }
+
     const args = [bridgePath, '--port', String(this.port), '--host', this.host];
 
     const modelPath = this.resolveModelPath(this.config?.whisper?.modelPath);
@@ -74,20 +79,50 @@ class FasterWhisperBridge {
       args.push('--compute-type', computeType);
     }
 
-    this.pythonProcess = spawn('python3', args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
+    const pythonExecutable = this.config?.bridge?.pythonPath || process.env.DD_PYTHON || 'python3';
+
+    this.bridgeReady = new Promise((resolve, reject) => {
+      try {
+        this.pythonProcess = spawn(pythonExecutable, args, {
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      } catch (error) {
+        this.pythonProcess = null;
+        this.bridgeReady = null;
+        reject(new Error(`[FasterWhisperBridge] failed to spawn ${pythonExecutable}: ${error.message}`));
+        return;
+      }
+
+      let lastError = '';
+
+      this.pythonProcess.stdout.on('data', (data) => {
+        this.logger.info('[FasterWhisperBridge] python:', data.toString().trim());
+      });
+      this.pythonProcess.stderr.on('data', (data) => {
+        const message = data.toString().trim();
+        lastError = message || lastError;
+        this.logger.error('[FasterWhisperBridge] python err:', message);
+      });
+      this.pythonProcess.once('error', (error) => {
+        this.logger.error('[FasterWhisperBridge] bridge process error:', error);
+        this.bridgeReady = null;
+        this.pythonProcess = null;
+        reject(new Error(`[FasterWhisperBridge] bridge process error: ${error.message}`));
+      });
+      this.pythonProcess.once('spawn', () => {
+        resolve();
+      });
+      this.pythonProcess.on('exit', (code, signal) => {
+        this.logger.info('[FasterWhisperBridge] python exited', code, signal);
+        this.pythonProcess = null;
+        this.bridgeReady = null;
+        if (code !== 0 && lastError) {
+          this.logger.error('[FasterWhisperBridge] bridge exited with error:', lastError);
+        }
+      });
     });
 
-    this.pythonProcess.stdout.on('data', (data) => {
-      this.logger.info('[FasterWhisperBridge] python:', data.toString().trim());
-    });
-    this.pythonProcess.stderr.on('data', (data) => {
-      this.logger.error('[FasterWhisperBridge] python err:', data.toString().trim());
-    });
-    this.pythonProcess.on('exit', (code, signal) => {
-      this.logger.info('[FasterWhisperBridge] python exited', code, signal);
-      this.pythonProcess = null;
-    });
+    return this.bridgeReady;
   }
 
   async waitForBridge(timeoutMs = 5000) {
@@ -170,6 +205,7 @@ class FasterWhisperBridge {
       this.pythonProcess.kill();
       this.pythonProcess = null;
     }
+    this.bridgeReady = null;
   }
 
   async resolveFetch() {

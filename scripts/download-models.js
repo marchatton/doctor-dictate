@@ -28,22 +28,33 @@ function ensureDestination(filePath) {
 function download(url, destination) {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(destination);
-    https
-      .get(url, (response) => {
-        if (response.statusCode !== 200) {
-          reject(new Error(`HTTP ${response.statusCode}`));
-          return;
-        }
-        response.pipe(file);
-        file.on('finish', () => file.close(resolve));
-      })
-      .on('error', (error) => {
-        fs.unlink(destination, () => reject(error));
-      });
+    const request = https.get(url, (response) => {
+      if (response.statusCode !== 200) {
+        reject(new Error(`HTTP ${response.statusCode}`));
+        return;
+      }
+      response.pipe(file);
+      file.on('finish', () => file.close(resolve));
+    });
+
+    request.on('timeout', () => {
+      request.destroy(new Error('Request timed out'));
+    });
+
+    request.on('error', (error) => {
+      fs.unlink(destination, () => reject(error));
+    });
+
+    request.setTimeout(30_000);
   });
 }
 
 async function main() {
+  if (process.env.DD_ALLOW_MODEL_DOWNLOADS !== '1') {
+    console.error('[download-models] Downloads are disabled. Set DD_ALLOW_MODEL_DOWNLOADS=1 to proceed.');
+    process.exitCode = 1;
+    return;
+  }
   for (const entry of DOWNLOADS) {
     ensureDestination(entry.destination);
     if (fs.existsSync(entry.destination)) {
@@ -53,10 +64,32 @@ async function main() {
 
     console.log(`[download-models] downloading ${entry.label}`);
     try {
-      await download(entry.url, entry.destination);
+      let attempts = 0;
+      let lastError = null;
+      while (attempts < 3) {
+        try {
+          await download(entry.url, entry.destination);
+          lastError = null;
+          break;
+        } catch (error) {
+          attempts += 1;
+          lastError = error;
+          console.warn(`[download-models] attempt ${attempts} failed for ${entry.label}:`, error.message);
+          if (attempts < 3) {
+            console.warn('[download-models] retrying...');
+          }
+        }
+      }
+
+      if (lastError) {
+        throw lastError;
+      }
       console.log(`[download-models] saved ${entry.label}`);
     } catch (error) {
       console.error(`[download-models] failed to download ${entry.label}:`, error.message);
+      if (fs.existsSync(entry.destination)) {
+        fs.unlinkSync(entry.destination);
+      }
       console.log('You can manually download the asset and place it at', entry.destination);
     }
   }

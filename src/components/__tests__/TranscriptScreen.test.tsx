@@ -13,6 +13,7 @@ describe('TranscriptScreen Component', () => {
     medications: [],
     mode: 'accurate',
     formattingMetadata: undefined,
+    modeDecision: undefined,
   };
 
   const mockProps = {

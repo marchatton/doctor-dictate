@@ -5,6 +5,13 @@ class ProgressReporter {
     this.logger = options.logger || console;
   }
 
+  updateContext(partial = {}) {
+    if (!partial || typeof partial !== 'object') {
+      return;
+    }
+    this.context = { ...this.context, ...partial };
+  }
+
   start(stage, payload = {}) {
     this.emit('stage', {
       stage: stage || 'unknown',
