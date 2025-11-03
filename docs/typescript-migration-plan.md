@@ -14,9 +14,9 @@ All items below are currently **Todo** unless marked otherwise.
 
 ## 1. Tooling & Configuration — **Status: In Progress**
 - [x] Harden TypeScript coverage in `tsconfig.json`/`tsconfig.node.json`, Jest, and Vite configs.
-- [ ] Add ambient declarations for preload bridges, assets, and Tailwind modules.
-- [ ] Refresh ESLint/Jest settings for TypeScript-first sources; configure `ts-jest` or equivalent. _(Jest already uses `ts-jest`, but ESLint still runs with the default JS parser and ruleset.)_
-- [ ] Replace remaining CommonJS `require` usage with ESM imports.
+- [ ] Add ambient declarations for preload bridges, assets, and Tailwind modules. _(No `global.d.ts` yet.)_
+- [ ] Refresh ESLint/Jest settings for TypeScript-first sources; configure `ts-jest` or equivalent. _(Jest already uses `ts-jest`, but `.eslintrc.js` still targets plain JS.)_
+- [ ] Replace remaining CommonJS `require` usage with ESM imports. _(Multiple modules under `src/data` and `src/prompts` still call `require()`.)_
 - [ ] Validate with `pnpm run lint` and `pnpm test` after updates.
 
 ## 2. Electron Entrypoints (`src/main`, `src/preload`, renderer bootstrap`) — **Status: Todo**
@@ -26,7 +26,7 @@ All items below are currently **Todo** unless marked otherwise.
 - [ ] Extend Jest/e2e suites to import and mock typed Electron modules.
 
 ## 3. Renderer UI (React components & hooks) — **Status: In Progress**
-- [x] Migrate renderer components and hooks to `.tsx` with typed props, state, and contexts. _(Primary screens/hooks live in `.tsx`/`.ts`; the `components/ui` primitives still include a few `.js` helpers.)_
+- [ ] Migrate renderer components and hooks to `.tsx` with typed props, state, and contexts. _(Primary screens/hooks live in `.tsx`/`.ts`; `components/ui/{button,card,waveform}.js` remain outstanding.)_
 - [ ] Centralize shared UI types (variants, contexts) to avoid duplication.
 - [ ] Update Storybook/docs references as needed while keeping Tailwind classes intact.
 - [ ] Port React Testing Library specs to TypeScript.
@@ -44,7 +44,7 @@ All items below are currently **Todo** unless marked otherwise.
 
 ## 6. Testing Infrastructure & Mocks — **Status: In Progress**
 - [ ] Convert Jest mocks under `src/__mocks__` to TypeScript or provide `.d.ts` shims.
-- [x] Rename renderer-facing tests to `.test.tsx` / `.test.ts`. _(Core UI tests already run under TypeScript; legacy service specs remain in `.js`.)_
+- [ ] Rename renderer-facing tests to `.test.tsx` / `.test.ts`. _(Multiple suites such as `src/__tests__/app.test.js` and `src/prompts/__tests__/*.test.js` still target JavaScript.)_
 - [x] Ensure coverage tooling targets new extensions.
 
 ## 7. Build Scripts & Automation — **Status: Todo**
