@@ -1,11 +1,30 @@
-const { MedicalPrompt, TemplateLoader } = require('../../../prompts');
-const { resolveQwenProfile, listQwenProfiles } = require('./QwenProfiles');
+import type { SectionManifest } from '../../../types/medical';
+import { MedicalPrompt, TemplateLoader } from '../../../prompts';
+import { resolveQwenProfile, listQwenProfiles } from './QwenProfiles';
 
-function mergeConfig(base = {}, overrides = {}) {
+export type PromptModeConfig = {
+  maxSegmentLength: number;
+  overlapSentences: number;
+  model: string;
+  timeout: number;
+  options: Record<string, unknown>;
+  profile?: ReturnType<typeof resolveQwenProfile>;
+};
+
+export type PromptManagerOptions = {
+  templateName?: string;
+  template?: ReturnType<typeof TemplateLoader.load>;
+  prompt?: InstanceType<typeof MedicalPrompt>;
+  qwenModel?: string;
+  modeConfigs?: Record<string, Partial<PromptModeConfig>>;
+  prompts?: Record<string, unknown>;
+};
+
+function mergeConfig(base: Record<string, unknown> = {}, overrides: Record<string, unknown> = {}): Record<string, unknown> {
   const merged = { ...base };
   for (const [key, value] of Object.entries(overrides)) {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      merged[key] = mergeConfig(base[key] || {}, value);
+      merged[key] = mergeConfig((base[key] as Record<string, unknown>) || {}, value as Record<string, unknown>);
     } else {
       merged[key] = value;
     }
@@ -13,8 +32,16 @@ function mergeConfig(base = {}, overrides = {}) {
   return merged;
 }
 
-class PromptManager {
-  constructor(options = {}) {
+export class PromptManager {
+  private readonly templateName: string;
+
+  private readonly template: ReturnType<typeof TemplateLoader.load>;
+
+  private readonly prompt: InstanceType<typeof MedicalPrompt>;
+
+  private readonly modeConfigs: Record<string, PromptModeConfig>;
+
+  constructor(options: PromptManagerOptions = {}) {
     this.templateName = options.templateName || 'medicine-management';
     this.template = options.template || TemplateLoader.load(this.templateName);
     this.prompt = options.prompt || new MedicalPrompt(this.template);
@@ -27,7 +54,7 @@ class PromptManager {
         maxSegmentLength: 800,
         overlapSentences: 1,
         model: 'tinyllama:1.1b',
-        timeout: 25000,
+        timeout: 25_000,
         options: {
           temperature: 0.1,
           num_ctx: 2048,
@@ -53,20 +80,20 @@ class PromptManager {
     if (options.modeConfigs) {
       for (const [mode, config] of Object.entries(options.modeConfigs)) {
         const base = this.modeConfigs[mode] || {};
-        this.modeConfigs[mode] = mergeConfig(base, config);
+        this.modeConfigs[mode] = mergeConfig(base, config) as PromptModeConfig;
       }
     }
   }
 
-  getModeConfig(mode) {
+  getModeConfig(mode: string): PromptModeConfig {
     return this.modeConfigs[mode] || this.modeConfigs.accurate;
   }
 
-  getAvailableLLMProfiles() {
+  getAvailableLLMProfiles(): ReturnType<typeof listQwenProfiles> {
     return listQwenProfiles();
   }
 
-  buildPrompt(text, context = {}) {
+  buildPrompt(text: string, context: { manifest?: SectionManifest; metadata?: { manifest?: SectionManifest } } = {}): string {
     const manifest = context.manifest || context.metadata?.manifest;
     if (manifest) {
       return this.prompt.generatePrompt(text, { manifest });
@@ -74,9 +101,7 @@ class PromptManager {
     return this.prompt.generatePrompt(text);
   }
 
-  postProcess(text) {
+  postProcess(text: string): string {
     return this.prompt.postProcess(text);
   }
 }
-
-module.exports = { PromptManager };

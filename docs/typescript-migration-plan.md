@@ -31,16 +31,16 @@ All items below are currently **Todo** unless marked otherwise.
 - [ ] Update Storybook/docs references as needed while keeping Tailwind classes intact.
 - [ ] Port React Testing Library specs to TypeScript.
 
-## 4. Services: Transcription & Formatting Pipelines — **Status: In Progress**
-- [ ] Introduce domain types (e.g., `TranscriptionResult`, `FormattingJob`).
-- [ ] Type Whisper/Ollama interactions with explicit interfaces and generics.
+## 4. Services: Transcription & Formatting Pipelines — **Status: Done**
+- [x] Introduce domain types (e.g., `TranscriptionResult`, `FormattingJob`). _(Structured manifest + prompt template contracts now live in `src/types/medical.ts` and power the formatting pipeline.)_
+- [x] Type Whisper/Ollama interactions with explicit interfaces and generics. _(Whisper transcriber already typed; Ollama formatter + structured response parser now in `src/services/formatting/*.ts`.)_
 - [x] Migrate model asset services (`ModelDownloader`, `ModelValidator`) and tests to `.ts`.
-- [ ] Run integration suites (`pnpm test`) to confirm behavior.
+- [x] Run integration suites (`pnpm test`) to confirm behavior.
 
-## 5. Prompts & Data Modules — **Status: In Progress**
-- [ ] Decide on typed JSON exports vs. TypeScript modules for prompt/data assets.
-- [ ] Encode prompt section enums and manifest schemas.
-- [x] Migrate medical dictionary, dosing patterns, and dictation command processor to `.ts` (ts-nocheck for now) and rewire consumers.
+## 5. Prompts & Data Modules — **Status: Done**
+- [x] Decide on typed JSON exports vs. TypeScript modules for prompt/data assets. _(Prompt index, detector, manifest builder, and static builder now ship as `.ts` and load typed templates.)_
+- [x] Encode prompt section enums and manifest schemas. _(Manifest builder + detector consume the shared `SectionManifest` and `PromptTemplate` interfaces.)_
+- [x] Migrate medical dictionary, dosing patterns, and dictation command processor to `.ts` and rewire consumers (ts-nocheck removed).
 
 ## 6. Testing Infrastructure & Mocks — **Status: In Progress**
 - [ ] Convert Jest mocks under `src/__mocks__` to TypeScript or provide `.d.ts` shims.

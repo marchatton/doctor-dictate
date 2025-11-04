@@ -23,7 +23,7 @@
     "test:ci": "jest --coverage --watchAll=false --passWithNoTests",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
-    "build-prompt": "node src/prompts/static-prompt-builder.js"
+    "build-prompt": "ts-node --project tsconfig.electron.json src/prompts/static-prompt-builder.ts"
   },
   "repository": {
     "type": "git",

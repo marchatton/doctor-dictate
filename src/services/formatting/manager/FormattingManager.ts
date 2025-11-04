@@ -1,10 +1,38 @@
-const { PromptManager } = require('./PromptManager');
-const { OllamaClient } = require('./OllamaClient');
-const { MedicalTermCache } = require('./MedicalTermCache');
-const { SegmentSplitter } = require('./SegmentSplitter');
+import { PromptManager, type PromptManagerOptions } from './PromptManager';
+import { OllamaClient } from './OllamaClient';
+import { MedicalTermCache } from './MedicalTermCache';
+import { SegmentSplitter } from './SegmentSplitter';
 
-class FormattingManager {
-  constructor(options = {}) {
+export type FormattingManagerOptions = {
+  promptManager?: PromptManager;
+  prompts?: PromptManagerOptions['prompts'];
+  ollamaClient?: OllamaClient;
+  ollama?: Record<string, unknown>;
+  cache?: MedicalTermCache;
+  cacheOptions?: Record<string, unknown>;
+  splitter?: SegmentSplitter;
+  splitterOptions?: Record<string, unknown>;
+  defaultMode?: string;
+};
+
+export type FormattingRequest = {
+  transcript: string;
+  mode?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export class FormattingManager {
+  private readonly promptManager: PromptManager;
+
+  private readonly ollamaClient: OllamaClient;
+
+  private readonly cache: MedicalTermCache;
+
+  private readonly splitter: SegmentSplitter;
+
+  private readonly defaultMode: string;
+
+  constructor(options: FormattingManagerOptions = {}) {
     this.promptManager = options.promptManager || new PromptManager(options.prompts);
     this.ollamaClient = options.ollamaClient || new OllamaClient(options.ollama);
     this.cache = options.cache || new MedicalTermCache(options.cacheOptions);
@@ -12,7 +40,11 @@ class FormattingManager {
     this.defaultMode = options.defaultMode || 'accurate';
   }
 
-  async format({ transcript, mode = this.defaultMode, metadata = {} }) {
+  async format({ transcript, mode = this.defaultMode, metadata = {} }: FormattingRequest): Promise<{
+    formatted: string;
+    segments: Array<{ formatted: string; text: string; source: 'cache' | 'ollama'; [key: string]: unknown }>;
+    metadata: Record<string, unknown>;
+  }> {
     const text = typeof transcript === 'string' ? transcript.trim() : '';
     if (!text) {
       return {
@@ -30,7 +62,7 @@ class FormattingManager {
       await this.ollamaClient.ensureModel(config.model);
     }
 
-    const formattedSegments = [];
+    const formattedSegments: Array<{ formatted: string; text: string; source: 'cache' | 'ollama'; [key: string]: unknown }> = [];
     let cacheHits = 0;
     let cacheMisses = 0;
 
@@ -102,5 +134,3 @@ class FormattingManager {
     };
   }
 }
-
-module.exports = { FormattingManager };

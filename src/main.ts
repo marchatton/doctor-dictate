@@ -12,7 +12,7 @@ import { AccurateMode } from './services/transcription/manager/modes/AccurateMod
 import { ProgressReporter } from './services/transcription/manager/utils/ProgressReporter.js';
 import { WhisperCppEngine } from './services/transcription/manager/engines/WhisperCppEngine.js';
 import { FasterWhisperBridge } from './services/transcription/manager/engines/FasterWhisperBridge.js';
-import { FormattingManager } from './services/formatting/manager/FormattingManager.js';
+import { FormattingManager } from './services/formatting/manager/FormattingManager';
 import { ModelValidator } from './services/models/ModelValidator';
 import { ModelDownloader } from './services/models/ModelDownloader';
 

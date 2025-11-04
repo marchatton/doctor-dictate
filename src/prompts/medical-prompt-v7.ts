@@ -1,34 +1,38 @@
-/**
- * Medical Prompt v7 - Simplified & Efficient
- * Focuses on essential instructions for medical note formatting
- */
+import * as fs from 'fs';
+import * as path from 'path';
+
+import medicalDictionary from '../data/medical-dictionary';
+import type { PromptTemplate, SectionManifest } from '../types/medical';
+
+type GenerateOptions = {
+  manifest?: SectionManifest;
+};
+
+type StructuredManifest = SectionManifest;
 
 class MedicalPromptV7 {
-  static VERSION = "7.0";
-  
-  constructor(template, options = {}) {
+  static VERSION = '7.0';
+
+  private readonly template: PromptTemplate;
+
+  private readonly corrections: typeof medicalDictionary.corrections;
+
+  constructor(template: PromptTemplate, _options: Record<string, unknown> = {}) {
     this.template = template;
-    // Only load the corrections we actually use
-    this.corrections = require('../data/medical-dictionary').corrections;
-    this.options = options;
+    this.corrections = medicalDictionary.corrections;
   }
-  
-  /**
-   * Generate concise, effective prompt
-   */
-  generatePrompt(dictationText, options = {}) {
+
+  generatePrompt(dictationText: string, options: GenerateOptions = {}): string {
     const { manifest } = options;
 
     if (manifest && manifest.entries && manifest.entries.length > 0) {
       return this.generateStructuredPrompt(dictationText, manifest);
     }
 
-    // No preprocessing - let LLM handle it
-    // Build a concise but complete prompt
-    const sections = this.template.sections.map(s => 
-      `${s.title}: ${s.format}${s.required ? ' (required)' : ''}`
-    ).join('\n');
-    
+    const sections = this.template.sections
+      .map((section) => `${section.title}: ${section.format}${section.required ? ' (required)' : ''}`)
+      .join('\n');
+
     const prompt = `Format this medical dictation into a structured note.
 
 AVAILABLE SECTIONS (only use if content exists):
@@ -74,31 +78,33 @@ INPUT TO FORMAT:
 ${dictationText}
 
 OUTPUT:`;
-    
+
     return prompt;
   }
 
-  generateStructuredPrompt(dictationText, manifest) {
-    const manifestLines = manifest.entries.map((entry, index) => {
-      const required = entry.templateSection ? entry.templateSection.required : false;
-      const origin = entry.type === 'known' ? 'template-section' : 'speaker-defined-section';
-      const format = entry.format || 'paragraph';
-      const guidance = entry.type === 'known'
-        ? 'Follow template rules. Maintain dictated content verbatim.'
-        : 'Keep dictated title and content exactly as provided; do not rename.';
-      const contentRange = entry.contentRange || { start: 0, end: 0 };
+  private generateStructuredPrompt(dictationText: string, manifest: StructuredManifest): string {
+    const manifestLines = manifest.entries
+      .map((entry, index) => {
+        const required = entry.templateSection ? Boolean(entry.templateSection.required) : false;
+        const origin = entry.type === 'known' ? 'template-section' : 'speaker-defined-section';
+        const format = entry.format || 'paragraph';
+        const guidance = entry.type === 'known'
+          ? 'Follow template rules. Maintain dictated content verbatim.'
+          : 'Keep dictated title and content exactly as provided; do not rename.';
+        const contentRange = entry.contentRange || { start: 0, end: 0 };
 
-      return `  {
+        return `  {
     "order": ${index},
     "key": "${entry.key}",
     "title": "${entry.title}",
     "format": "${format}",
     "required": ${required},
     "origin": "${origin}",
-    "dictationRange": { "start": ${contentRange.start}, "end": ${contentRange.end} },
+    "dictationRange": { "start": ${contentRange.start ?? 0}, "end": ${contentRange.end ?? 0} },
     "guidance": "${guidance}"
   }`;
-    }).join(',\n');
+      })
+      .join(',\n');
 
     const jsonSchema = `Return ONLY valid JSON using this schema:
 {
@@ -149,43 +155,32 @@ Respond with JSON only.`;
 
     return prompt;
   }
-  
-  /**
-   * Post-process formatted text - minimal cleanup
-   */
-  postProcess(text) {
+
+  postProcess(text: string): string {
     if (!text) {
       return '';
     }
 
-    let normalized = text
-      .replace(/\r\n/g, '\n')
-      .replace(/\n{3,}/g, '\n\n');
+    let normalized = text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n');
 
-    // Ensure every header is followed by a blank line for readability
     normalized = normalized.replace(/(###\s+[^\n]+)\n(?!\n)/g, '$1\n\n');
 
-    // Collapse repeated blank lines between non-header content to a single blank line
     normalized = normalized.replace(/(^|\n)(?!###\s)([^\n]+)\n\n(?![#])/g, (_, prefix, line) => `${prefix}${line}\n`);
 
     return normalized.trim();
   }
 }
 
-/**
- * Template Loader - streamlined
- */
 class TemplateLoader {
-  static load(templateName) {
-    try {
-      return require(`../templates/format/${templateName}.json`);
-    } catch (error) {
+  static load(templateName: string): PromptTemplate {
+    const templatePath = path.join(__dirname, '../templates/format', `${templateName}.json`);
+    if (!fs.existsSync(templatePath)) {
       throw new Error(`Template '${templateName}' not found`);
     }
+
+    const raw = fs.readFileSync(templatePath, 'utf8');
+    return JSON.parse(raw) as PromptTemplate;
   }
 }
 
-module.exports = { 
-  MedicalPromptV7,
-  TemplateLoader
-};
+export { MedicalPromptV7, TemplateLoader };

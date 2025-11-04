@@ -1,6 +1,8 @@
+import type { ManifestEntry, SectionManifest, StructuredPayload, StructuredSection } from '../../types/medical';
+
 const JSON_START = /\{\s*"sections"/;
 
-function extractJsonBlock(raw) {
+function extractJsonBlock(raw: string): string {
   const startIndex = raw.search(JSON_START);
   if (startIndex === -1) {
     throw new Error('No JSON object detected in response');
@@ -30,19 +32,20 @@ function extractJsonBlock(raw) {
   return substring.slice(0, endIndex);
 }
 
-function normalizeSections(sections, manifest) {
+function normalizeSections(sections: unknown, manifest: Pick<SectionManifest, 'entries'> | { entries?: ManifestEntry[] }): StructuredSection[] {
   if (!Array.isArray(sections)) {
     throw new Error('sections must be an array');
   }
 
-  const manifestByKey = new Map((manifest.entries || []).map((entry) => [entry.key, entry]));
+  const manifestByKey = new Map((manifest.entries ?? []).map((entry) => [entry.key, entry]));
 
   return sections.map((section) => {
     if (!section || typeof section !== 'object') {
       throw new Error('Invalid section entry');
     }
 
-    const { key, title, body, confidence } = section;
+    const typedSection = section as Partial<StructuredSection> & { key?: string; body?: string; title?: string; confidence?: number };
+    const { key, title, body, confidence } = typedSection;
 
     if (!key || typeof key !== 'string') {
       throw new Error('Section missing key');
@@ -52,25 +55,28 @@ function normalizeSections(sections, manifest) {
       throw new Error(`Section ${key} missing string body`);
     }
 
-    const manifestEntry = manifestByKey.get(key) || null;
+    const manifestEntry = manifestByKey.get(key) ?? null;
 
     return {
       key,
-      title: typeof title === 'string' ? title : manifestEntry?.title || '',
+      title: typeof title === 'string' ? title : manifestEntry?.title,
       body,
       confidence: typeof confidence === 'number' ? confidence : null,
-      manifestEntry
-    };
+      manifestEntry: manifestEntry ?? undefined,
+    } satisfies StructuredSection;
   });
 }
 
-function parseStructuredResponse(rawResponse, manifest = { entries: [] }) {
+export function parseStructuredResponse(
+  rawResponse: string,
+  manifest: Pick<SectionManifest, 'entries'> | { entries?: ManifestEntry[] } = { entries: [] },
+): StructuredPayload {
   if (typeof rawResponse !== 'string') {
     throw new Error('Response must be a string');
   }
 
   const jsonText = extractJsonBlock(rawResponse);
-  let parsed;
+  let parsed: { sections?: unknown; uncategorized?: unknown; [key: string]: unknown };
 
   try {
     parsed = JSON.parse(jsonText);
@@ -83,16 +89,13 @@ function parseStructuredResponse(rawResponse, manifest = { entries: [] }) {
   }
 
   const sections = normalizeSections(parsed.sections, manifest);
-  const uncategorized = Array.isArray(parsed.uncategorized) ? parsed.uncategorized : [];
+  const uncategorized = Array.isArray(parsed.uncategorized)
+    ? parsed.uncategorized.filter((fragment): fragment is string => typeof fragment === 'string')
+    : [];
 
   return {
     sections,
     uncategorized,
-    raw: parsed
+    raw: parsed,
   };
 }
-
-module.exports = {
-  parseStructuredResponse
-};
-

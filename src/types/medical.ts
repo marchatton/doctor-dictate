@@ -76,24 +76,96 @@ export type MedicalDictionary = {
   validate: MedicalDictionaryValidate;
 };
 
-export type ManifestEntry = {
-  key?: string;
-  title?: string;
-  detectedTitle?: string;
-  format?: string;
-  contentRange?: {
-    start?: number;
-    end?: number;
-  };
+export type SectionFormat = 'paragraph' | 'bullet-list' | 'numbered-list' | 'single-line' | 'table' | string;
+
+export type TemplateSection = {
+  id: string;
+  title: string;
+  required?: boolean;
+  format: SectionFormat;
+  patterns?: string[];
+  itemFormat?: string;
+  description?: string;
+  example?: string | string[];
+  autoFill?: boolean;
+  templateSpecific?: string[];
+  constraints?: string[];
   [key: string]: unknown;
+};
+
+export type TemplateFormatting = {
+  sectionHeaderLevel?: number;
+  sectionHeaderPrefix?: string;
+  sectionSeparator?: string;
+  listItemPrefix?: Record<string, string>;
+  listSeparators?: Record<string, string>;
+  [key: string]: unknown;
+};
+
+export type PromptTemplate = {
+  id: string;
+  name: string;
+  version?: string;
+  description?: string;
+  sections: TemplateSection[];
+  formatting?: TemplateFormatting;
+  templateSpecificRules?: Array<{ section: string; rule: string }>;
+};
+
+export type ManifestRange = {
+  start: number;
+  end: number | null;
+};
+
+export type ManifestEntry = {
+  order: number;
+  key: string;
+  id: string | null;
+  title: string;
+  detectedTitle?: string;
+  type: 'known' | 'smart' | 'speaker-defined-section' | 'unsectioned' | string;
+  confidence: number;
+  position: number;
+  lineNumber: number;
+  lineText: string;
+  format: SectionFormat;
+  templateSection: {
+    id: string;
+    required: boolean;
+    format?: SectionFormat;
+  } | null;
+  range: ManifestRange;
+  contentRange: ManifestRange;
+  lineRange: ManifestRange;
+  [key: string]: unknown;
+};
+
+export type SectionManifestSummary = {
+  textLength: number;
+  totalDetected: number;
+  knownCount: number;
+  unknownCount: number;
+  missingRequired: string[];
+  hasFallback: boolean;
+};
+
+export type SectionManifest = {
+  entries: ManifestEntry[];
+  summary: SectionManifestSummary;
 };
 
 export type StructuredSection = {
   key: string;
   title?: string;
   body?: string;
-  confidence?: number;
+  confidence?: number | null;
   manifestEntry?: ManifestEntry;
+};
+
+export type StructuredPayload = {
+  sections: StructuredSection[];
+  uncategorized: string[];
+  raw: unknown;
 };
 
 export type StructuredNoteReport = {
@@ -109,8 +181,9 @@ export type FormatterResponseSuccess = {
   formatted: string;
   model?: string;
   promptVersion?: string;
-  manifest?: unknown;
+  manifest?: SectionManifest;
   verification?: StructuredNoteReport;
+  structured?: StructuredPayload;
 };
 
 export type FormatterResponseFailure = {
@@ -118,6 +191,7 @@ export type FormatterResponseFailure = {
   formatted: string;
   error?: string;
   model?: string;
+  manifest?: SectionManifest;
 };
 
 export type FormatterResponse = FormatterResponseSuccess | FormatterResponseFailure;

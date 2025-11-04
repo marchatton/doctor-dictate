@@ -311,7 +311,7 @@ class DictationCommandProcessor {
         
         // Lazy-load OllamaFormatter to avoid circular dependency
         if (!this.ollamaFormatter) {
-            const module = (await import('../services/formatting/ollama-formatter.js')) as unknown as {
+            const module = (await import('../services/formatting/ollama-formatter')) as unknown as {
                 OllamaFormatter: MedicalFormatterConstructor;
             };
             this.ollamaFormatter = new module.OllamaFormatter();
