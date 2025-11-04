@@ -1,32 +1,105 @@
-// @ts-nocheck
-
-/**
- * Whisper AI Integration for DoctorDictate
- * Handles audio transcription with medical dictionary post-processing
- */
-
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
-import medicalDictionary from '../../data/medical-dictionary';
+import medicalDictionaryData from '../../data/medical-dictionary';
 import { DictationCommandProcessor } from '../../data/dictation-commands';
-const { AudioProcessor } = require('../audio/processor.js');
-const { TranscriptionProgress } = require('./progress-tracker.js');
+import type { MedicalDictionary } from '../../types/medical';
+
+type AvailableModelInfo = {
+    name: string;
+    speed: string;
+    accuracy: string;
+    size: string;
+};
+
+type TranscriptionChunk = {
+    path: string;
+    overlap?: number;
+    index: number;
+};
+
+type ProcessedAudio = {
+    chunks: TranscriptionChunk[];
+    duration?: number;
+};
+
+type ChunkTranscription = {
+    text: string;
+    overlap?: number;
+    index: number;
+};
+
+type MedicalCorrection = {
+    original: string;
+    corrected: string;
+    type: string;
+    [key: string]: unknown;
+};
+
+type MedicationFinding = {
+    name: string;
+    dosage?: string;
+    unit?: string;
+    category?: string;
+    fullMatch?: string;
+};
+
+type TranscriptionResult = {
+    raw: string;
+    corrected: string;
+    formatted: string;
+    corrections: MedicalCorrection[];
+    medications: MedicationFinding[];
+    dictationCommands: unknown;
+    metadata: Record<string, unknown>;
+};
+
+type AudioProcessorLike = {
+    getAudioDuration(filePath: string): Promise<number>;
+    processAudio(filePath: string, onProgress: (stage: string, percent?: number) => void): Promise<ProcessedAudio>;
+    combineTranscriptions(chunks: ChunkTranscription[]): string;
+    cleanup(chunks: TranscriptionChunk[]): Promise<void>;
+};
+
+type AudioProcessorCtor = new () => AudioProcessorLike;
+
+type TranscriptionProgressLike = {
+    setModel(model: string): void;
+    nextStage(stage: string): void;
+    getProgress(stage?: string, percent?: number): unknown;
+    complete(): unknown;
+};
+
+type TranscriptionProgressCtor = new (duration: number) => TranscriptionProgressLike;
+
+type ProgressCallback = ((progress: unknown) => void) | null;
+
+const { AudioProcessor }: { AudioProcessor: AudioProcessorCtor } = require('../audio/processor.js');
+const { TranscriptionProgress }: { TranscriptionProgress: TranscriptionProgressCtor } = require('./progress-tracker.js');
+
+const medicalDictionary = medicalDictionaryData as MedicalDictionary;
 
 class WhisperTranscriber {
+    private static readonly AUTOSAVE_INTERVAL_MS = 30 * 1000;
+
+    private isProcessing: boolean;
+    private whisperEnvPath: string | null;
+    private readonly dictationProcessor: DictationCommandProcessor;
+    private readonly audioProcessor: AudioProcessorLike;
+    private selectedModel: string;
+    private readonly availableModels: Record<string, AvailableModelInfo>;
+
     constructor() {
         this.isProcessing = false;
-        this.pythonPath = 'python3'; // Will auto-detect or allow user config
-        this.whisperEnvPath = null; // Path to Python venv with Whisper
+        this.whisperEnvPath = null;
         this.dictationProcessor = new DictationCommandProcessor();
         this.audioProcessor = new AudioProcessor();
-        
-        // Model configuration - default to small for high accuracy
-        this.selectedModel = 'small.en'; // Default to high accuracy
+
+        this.selectedModel = 'small.en';
         this.availableModels = {
             'small.en': { name: 'High Accuracy', speed: 'Moderate', accuracy: 'High', size: '244 MB' },
-            'tiny.en': { name: 'Fast', speed: 'Fast', accuracy: 'Good', size: '39 MB' }
+            'tiny.en': { name: 'Fast', speed: 'Fast', accuracy: 'Good', size: '39 MB' },
         };
     }
 
@@ -34,7 +107,7 @@ class WhisperTranscriber {
      * Initialize Whisper environment
      * Sets up Python virtual environment and installs Whisper if needed
      */
-    async initializeWhisper() {
+    async initializeWhisper(): Promise<boolean> {
         try {
             // Check if whisper-cpp is available
             const { execSync } = require('child_process');
@@ -69,7 +142,7 @@ class WhisperTranscriber {
     /**
      * Get available models for user selection
      */
-    getAvailableModels() {
+    getAvailableModels(): Record<string, AvailableModelInfo> {
         return this.availableModels;
     }
 
@@ -77,7 +150,7 @@ class WhisperTranscriber {
      * Set the Whisper model to use
      * @param {string} model - Model name (e.g., 'base.en', 'medium.en')
      */
-    setModel(model) {
+    setModel(model: string): boolean {
         if (this.availableModels[model]) {
             this.selectedModel = model;
             console.log(`Whisper model set to: ${model}`);
@@ -90,7 +163,7 @@ class WhisperTranscriber {
     /**
      * Get current model information
      */
-    getCurrentModel() {
+    getCurrentModel(): { model: string; info: AvailableModelInfo } {
         return {
             model: this.selectedModel,
             info: this.availableModels[this.selectedModel]
@@ -100,7 +173,7 @@ class WhisperTranscriber {
     /**
      * Reset processing state - useful when errors occur
      */
-    resetProcessingState() {
+    resetProcessingState(): void {
         this.isProcessing = false;
         console.log('Processing state reset');
     }
@@ -108,7 +181,7 @@ class WhisperTranscriber {
     /**
      * Check if currently processing
      */
-    getProcessingState() {
+    getProcessingState(): boolean {
         return this.isProcessing;
     }
 
@@ -118,7 +191,7 @@ class WhisperTranscriber {
      * @param {function} progressCallback - Called with progress updates
      * @returns {Promise<{raw: string, corrected: string, corrections: Array}>}
      */
-    async transcribeAudio(audioFilePath, progressCallback = null) {
+    async transcribeAudio(audioFilePath: string, progressCallback: ProgressCallback = null): Promise<TranscriptionResult> {
         if (this.isProcessing) {
             throw new Error('Already processing audio. Please wait.');
         }
@@ -129,8 +202,8 @@ class WhisperTranscriber {
         }
 
         this.isProcessing = true;
-        let processedAudio = null;
-        let progressTracker = null;
+        let processedAudio: ProcessedAudio | null = null;
+        let progressTracker: TranscriptionProgressLike | null = null;
 
         try {
             // Initialize progress tracker with audio duration
@@ -146,7 +219,7 @@ class WhisperTranscriber {
             
             processedAudio = await this.audioProcessor.processAudio(
                 audioFilePath,
-                (stage, percent) => {
+                (stage: string, percent?: number) => {
                     if (!progressCallback || !progressTracker) {
                         return;
                     }
@@ -161,10 +234,9 @@ class WhisperTranscriber {
                 progressCallback(progressTracker.getProgress());
             }
             
-            const transcriptions = [];
+            const transcriptions: ChunkTranscription[] = [];
             const totalChunks = processedAudio.chunks.length;
             let lastSaveTime = Date.now();
-            const AUTOSAVE_INTERVAL = 30 * 1000; // 30 seconds
             
             for (let i = 0; i < totalChunks; i++) {
                 const chunk = processedAudio.chunks[i];
@@ -183,22 +255,23 @@ class WhisperTranscriber {
                 
                 // Auto-save progress every 30 seconds
                 const currentTime = Date.now();
-                if (currentTime - lastSaveTime > AUTOSAVE_INTERVAL) {
+                if (currentTime - lastSaveTime > WhisperTranscriber.AUTOSAVE_INTERVAL_MS) {
                     try {
                         const partialTranscript = this.audioProcessor.combineTranscriptions(transcriptions);
                         await this.savePartialProgress(audioFilePath, partialTranscript, i + 1, totalChunks);
                         lastSaveTime = currentTime;
                     } catch (error) {
-                        console.warn('Auto-save failed:', error.message);
+                        const message = error instanceof Error ? error.message : String(error);
+                        console.warn('Auto-save failed:', message);
                     }
                 }
             }
             
             // Combine chunk transcriptions
             console.log(`🔍 WHISPER - Combining ${transcriptions.length} chunks:`);
-            transcriptions.forEach((t, i) => {
-                console.log(`  Chunk ${i}: ${t.text.length} chars, overlap: ${t.overlap}`);
-                console.log(`    Preview: ${t.text.substring(0, 50)}...`);
+            transcriptions.forEach((chunkResult, index) => {
+                console.log(`  Chunk ${index}: ${chunkResult.text.length} chars, overlap: ${chunkResult.overlap}`);
+                console.log(`    Preview: ${chunkResult.text.substring(0, 50)}...`);
             });
             const rawTranscript = this.audioProcessor.combineTranscriptions(transcriptions);
             console.log(`🔍 WHISPER - Combined transcript: ${rawTranscript.length} chars`);
@@ -224,6 +297,10 @@ class WhisperTranscriber {
             // Complete
             if (progressCallback) {
                 progressCallback(progressTracker.complete());
+            }
+
+            if (!processedAudio) {
+                throw new Error('Audio processor did not return any chunks');
             }
 
             console.log('🔍 WHISPER FINAL RESULT:');
@@ -256,7 +333,7 @@ class WhisperTranscriber {
         } catch (error) {
             // Cleanup on error
             if (processedAudio && processedAudio.chunks) {
-                await this.audioProcessor.cleanup(processedAudio.chunks);
+            await this.audioProcessor.cleanup(processedAudio.chunks);
             }
             throw error;
         } finally {
@@ -268,13 +345,13 @@ class WhisperTranscriber {
      * Run Whisper transcription on audio file
      * @private
      */
-    async runWhisper(audioFilePath) {
+    async runWhisper(audioFilePath: string): Promise<string> {
         // Use WhisperCpp service instead of Python
         const { WhisperCpp } = require('./whisper-cpp');
         
         try {
             // Set the model based on selectedModel
-            const modelMap = {
+            const modelMap: Record<string, string> = {
                 'tiny': 'tiny.en',
                 'base': 'base.en',
                 'small': 'small.en',
@@ -283,11 +360,11 @@ class WhisperTranscriber {
                 'small.en': 'small.en'
             };
             
-            const model = modelMap[this.selectedModel] || 'tiny.en';
+            const model = modelMap[this.selectedModel as keyof typeof modelMap] || 'tiny.en';
             console.log(`Using WhisperCpp with model: ${model}`);
             
             // Create WhisperCpp with the correct model
-            const whisperCpp = new WhisperCpp({ model: model });
+            const whisperCpp = new WhisperCpp({ model });
             
             // Transcribe using WhisperCpp (second param is options, not model)
             const result = await whisperCpp.transcribe(audioFilePath, {});
@@ -385,10 +462,14 @@ class WhisperTranscriber {
      * Apply medical dictionary corrections to raw transcript
      * @private
      */
-    applyMedicalCorrections(rawText) {
+    applyMedicalCorrections(rawText: string): {
+        correctedText: string;
+        corrections: MedicalCorrection[];
+        medicationsFound: MedicationFinding[];
+    } {
         let correctedText = rawText;
-        const corrections = [];
-        const medicationsFound = [];
+        const corrections: MedicalCorrection[] = [];
+        const medicationsFound: MedicationFinding[] = [];
 
         // Apply corrections from medical dictionary
         if (medicalDictionary && medicalDictionary.medications) {
@@ -430,7 +511,7 @@ class WhisperTranscriber {
                 correctedText = correctedText.replace(norm.from, norm.to);
                 
                 // Add proper correction entry for each match
-                originalMatches.forEach(originalMatch => {
+                originalMatches.forEach((originalMatch) => {
                     const correctedMatch = originalMatch.replace(norm.from, norm.to);
                     corrections.push({
                         original: originalMatch,
@@ -482,7 +563,13 @@ class WhisperTranscriber {
     /**
      * Get transcription confidence score
      */
-    getConfidenceScore(rawText, correctedText, corrections) {
+    getConfidenceScore(rawText: string, _correctedText: string, corrections: MedicalCorrection[]): {
+        overall: number;
+        medications: number;
+        dosages: number;
+        wordCount: number;
+        correctionCount: number;
+    } {
         const totalWords = rawText.split(/\s+/).length;
         const correctionCount = corrections.length;
         
@@ -501,8 +588,11 @@ class WhisperTranscriber {
     /**
      * Validate if Whisper is available and working
      */
-    async validateWhisperInstallation() {
+    async validateWhisperInstallation(): Promise<boolean> {
         try {
+            if (!this.whisperEnvPath) {
+                return false;
+            }
             const pythonExecutable = process.platform === 'win32' 
                 ? path.join(this.whisperEnvPath, 'Scripts', 'python.exe')
                 : path.join(this.whisperEnvPath, 'bin', 'python');
@@ -531,7 +621,12 @@ class WhisperTranscriber {
      * @param {number} totalChunks - Total number of chunks
      * @private
      */
-    async savePartialProgress(originalFilePath, partialTranscript, completedChunks, totalChunks) {
+    async savePartialProgress(
+        originalFilePath: string,
+        partialTranscript: string,
+        completedChunks: number,
+        totalChunks: number,
+    ): Promise<void> {
         try {
             const os = require('os');
             const timestamp = Date.now();
@@ -554,7 +649,8 @@ class WhisperTranscriber {
             this.cleanupOldProgressFiles();
             
         } catch (error) {
-            console.warn('Failed to save progress:', error.message);
+            const message = error instanceof Error ? error.message : String(error);
+            console.warn('Failed to save progress:', message);
         }
     }
 
@@ -562,18 +658,18 @@ class WhisperTranscriber {
      * Clean up old progress files to prevent disk clutter
      * @private
      */
-    cleanupOldProgressFiles() {
+    cleanupOldProgressFiles(): void {
         try {
             const os = require('os');
             const tmpDir = os.tmpdir();
             const progressFiles = fs.readdirSync(tmpDir)
-                .filter(file => file.startsWith('doctordictate-progress-'))
-                .map(file => ({
+                .filter((file: string) => file.startsWith('doctordictate-progress-'))
+                .map((file: string) => ({
                     name: file,
                     path: path.join(tmpDir, file),
-                    mtime: fs.statSync(path.join(tmpDir, file)).mtime
+                    mtime: fs.statSync(path.join(tmpDir, file)).mtime,
                 }))
-                .sort((a, b) => b.mtime - a.mtime); // newest first
+                .sort((a, b) => b.mtime.getTime() - a.mtime.getTime()); // newest first
             
             // Keep only the 3 most recent progress files
             for (let i = 3; i < progressFiles.length; i++) {
@@ -586,8 +682,8 @@ class WhisperTranscriber {
 }
 
 // Utility function to escape special regex characters
-function escapeRegExp(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export { WhisperTranscriber };

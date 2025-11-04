@@ -5,6 +5,7 @@ import path from 'path';
 import PDFDocument from 'pdfkit';
 
 import { WhisperTranscriber } from './services/transcription/whisper';
+import type { TranscriptionCorrection } from './types/medical';
 import { TranscriptionManager } from './services/transcription/manager/TranscriptionManager.js';
 import { FastMode } from './services/transcription/manager/modes/FastMode.js';
 import { AccurateMode } from './services/transcription/manager/modes/AccurateMode.js';
@@ -532,7 +533,7 @@ ipcMain.handle('reset-transcription-state', async () => {
   }
 });
 
-ipcMain.handle('get-confidence-score', async (_event, { rawText, correctedText, corrections }: { rawText: string; correctedText: string; corrections: unknown }) => {
+ipcMain.handle('get-confidence-score', async (_event, { rawText, correctedText, corrections }: { rawText: string; correctedText: string; corrections: TranscriptionCorrection[] }) => {
   try {
     const score = sharedWhisperTranscriber.getConfidenceScore(rawText, correctedText, corrections);
     return { success: true, confidence: score };
