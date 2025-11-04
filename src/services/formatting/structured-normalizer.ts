@@ -91,19 +91,25 @@ function capitalizeMedication(name: string): string {
     .trim();
 }
 
-function findClosestMedication(candidateLower: string): { name: string; distance: number } | null {
-  let best: { name: string; distance: number } | null = null;
+function findClosestMedication(candidateLower: string): string | null {
+  let bestName: string | null = null;
+  let bestDistance = Infinity;
+
   knownMedicationCatalog.forEach((canonical, lower) => {
     const distance = levenshtein(candidateLower, lower);
-    if (!best || distance < best.distance) {
-      best = { name: canonical, distance };
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestName = canonical;
     }
   });
 
-  if (!best) return null;
+  if (!bestName) {
+    return null;
+  }
 
-  const threshold = Math.max(2, Math.ceil(best.name.length * 0.35));
-  return best.distance <= threshold ? best : null;
+  const canonicalName = bestName as string;
+  const threshold = Math.max(2, Math.ceil(canonicalName.length * 0.35));
+  return bestDistance <= threshold ? canonicalName : null;
 }
 
 function resolveMedicationName(candidate: string): MedicationResolution {
@@ -122,7 +128,7 @@ function resolveMedicationName(candidate: string): MedicationResolution {
 
   const closest = findClosestMedication(lower);
   if (closest) {
-    return { text: closest.name, bracket: true };
+    return { text: closest, bracket: true };
   }
 
   return { text: capitalizeMedication(trimmed), bracket: true };

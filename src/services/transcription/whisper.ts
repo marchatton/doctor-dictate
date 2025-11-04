@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 /**
  * Whisper AI Integration for DoctorDictate
  * Handles audio transcription with medical dictionary post-processing

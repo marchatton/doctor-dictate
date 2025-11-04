@@ -1,7 +1,4 @@
-import type {
-    FormatterResponse,
-    ManifestEntry,
-} from '../types/medical';
+import type { FormatterResponse } from '../types/medical';
 
 type CommandPattern = {
     pattern: RegExp;
@@ -32,12 +29,15 @@ type MedicalFormatterInstance = {
     formatMedicalDictation: (text: string, options?: Record<string, unknown>) => Promise<FormatterResponse>;
 };
 
+type MedicalFormatterConstructor = new (config?: Record<string, unknown>) => MedicalFormatterInstance;
+
 type MedicalFormattingResult = ProcessedCommandsResult & {
     improvements: unknown[];
     method: string;
     model: string;
     formatted: boolean;
-}; 
+    success: boolean;
+};
 
 type StructuredDataResult = {
     fullText: string;
@@ -294,38 +294,6 @@ class DictationCommandProcessor {
     }
     
     /**
-     * Clean up formatting issues after command processing
-     */
-    private cleanupFormatting(text: string): string {
-        let cleaned = text;
-        
-        // Only apply cleanup if text was actually processed (contains replacements)
-        // Remove extra spaces before punctuation (but be gentle)
-        cleaned = cleaned.replace(/\s+([,.;:!?])/g, '$1');
-        
-        // Add space after punctuation if missing (except at end of line)
-        cleaned = cleaned.replace(/([,.;:!?])(\w)/g, '$1 $2');
-        
-        // Fix double punctuation issues (e.g., ",," -> ",")
-        cleaned = cleaned.replace(/([,.;:!?])\1+/g, '$1');
-        
-        // Fix spacing around parentheses
-        cleaned = cleaned.replace(/\s*\(\s*/g, ' (');
-        cleaned = cleaned.replace(/\s*\)\s*/g, ') ');
-        
-        // Remove multiple consecutive line breaks (max 2)
-        cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
-        
-        // Fix multiple spaces
-        cleaned = cleaned.replace(/\s{2,}/g, ' ');
-        
-        // Trim whitespace
-        cleaned = cleaned.trim();
-        
-        return cleaned;
-    }
-    
-    /**
      * Process medical note formatting specifically
      * Enhanced with comprehensive medical formatting including Ollama LLM
      */
@@ -343,18 +311,21 @@ class DictationCommandProcessor {
         
         // Lazy-load OllamaFormatter to avoid circular dependency
         if (!this.ollamaFormatter) {
-            const module = (await import('../services/formatting/ollama-formatter.js')) as {
-                OllamaFormatter: new () => MedicalFormatterInstance;
+            const module = (await import('../services/formatting/ollama-formatter.js')) as unknown as {
+                OllamaFormatter: MedicalFormatterConstructor;
             };
             this.ollamaFormatter = new module.OllamaFormatter();
         }
         
         const medicalFormatter = this.ollamaFormatter;
+        if (!medicalFormatter) {
+            throw new Error('Ollama formatter failed to initialize');
+        }
         const medicalResult = await medicalFormatter.formatMedicalDictation(dictationResult.processed);
         console.log('  Final result success:', medicalResult.success);
         console.log('  Final result:', medicalResult.formatted.substring(0, 150) + '...');
         
-        const finalOutput: MedicalFormattingResult & { original: string } = {
+        const finalOutput: MedicalFormattingResult = {
             original: text,
             processed: medicalResult.formatted || text,
             commands: dictationResult.commands,
@@ -362,7 +333,8 @@ class DictationCommandProcessor {
             improvements: [],
             method: medicalResult.success ? 'ollama' : 'error',
             model: medicalResult.model || 'unknown',
-            formatted: medicalResult.success || false
+            formatted: medicalResult.success || false,
+            success: medicalResult.success,
         };
         
         console.log('🔍 DICTATION PROCESSOR END - returning processed text of length:', finalOutput.processed.length);
@@ -591,18 +563,20 @@ class DictationCommandProcessor {
         
         // 9. Final capitalization pass for section headers
         // Capitalize headers at start of line or after sentence breaks
-        cleaned = cleaned.replace(/(^|\. )([a-z][^:]*:)/gm, (match, prefix, header) => {
-            const capitalizedHeader = header.split(' ').map(word => 
-                word.replace(':', '').charAt(0).toUpperCase() + word.replace(':', '').slice(1).toLowerCase()
-            ).join(' ') + ':';
+        cleaned = cleaned.replace(/(^|\. )([a-z][^:]*:)/gm, (_match: string, prefix: string, header: string) => {
+            const capitalizedHeader = header
+                .split(' ')
+                .map((word: string) => word.replace(':', '').charAt(0).toUpperCase() + word.replace(':', '').slice(1).toLowerCase())
+                .join(' ') + ':';
             return prefix + capitalizedHeader;
         });
         
         // Also catch headers after periods followed by space
-        cleaned = cleaned.replace(/(\. )([a-z][^:]*:)/g, (match, prefix, header) => {
-            const capitalizedHeader = header.split(' ').map(word => 
-                word.replace(':', '').charAt(0).toUpperCase() + word.replace(':', '').slice(1).toLowerCase()
-            ).join(' ') + ':';
+        cleaned = cleaned.replace(/(\. )([a-z][^:]*:)/g, (_match: string, prefix: string, header: string) => {
+            const capitalizedHeader = header
+                .split(' ')
+                .map((word: string) => word.replace(':', '').charAt(0).toUpperCase() + word.replace(':', '').slice(1).toLowerCase())
+                .join(' ') + ':';
             return prefix + capitalizedHeader;
         });
         
@@ -625,12 +599,12 @@ class DictationCommandProcessor {
         // → "Problem List:\n1. ADHD: improving\n2. Depression: stable"
         formatted = formatted.replace(
             /((?:Problem List|Current Medications|Assessment|Plan):\s*)([^.]*?)(?=\n\n|\n[A-Z]|$)/gi,
-            (match, header, content) => {
+            (original: string, header: string, content: string) => {
                 const listItems = this.extractNumberedItems(content);
                 if (listItems.length > 1) {
-                    return header + '\n' + listItems.map((item, i) => `${i + 1}. ${item.trim()}`).join('\n') + '\n';
+                    return header + '\n' + listItems.map((item: string, index: number) => `${index + 1}. ${item.trim()}`).join('\n') + '\n';
                 }
-                return match; // Return unchanged if not a clear list
+                return original; // Return unchanged if not a clear list
             }
         );
         
@@ -638,12 +612,12 @@ class DictationCommandProcessor {
         // "1) item one 2) item two 3) item three" → "1. item one\n2. item two\n3. item three"
         formatted = formatted.replace(
             /(\d+\)\s*[^.]*?)(\d+\)\s*[^.]*?)/g,
-            (match) => {
-                const items = this.extractNumberedItems(match);
+            (sequence: string) => {
+                const items = this.extractNumberedItems(sequence);
                 if (items.length >= 2) {
-                    return items.map((item, i) => `${i + 1}. ${item.trim()}`).join('\n');
+                    return items.map((item: string, index: number) => `${index + 1}. ${item.trim()}`).join('\n');
                 }
-                return match;
+                return sequence;
             }
         );
         
@@ -651,7 +625,7 @@ class DictationCommandProcessor {
         // Handle "one ADHD, two depression" patterns common in medical dictation
         formatted = formatted.replace(
             /(Problem List:|Current Medications:|Assessment:|Plan:)\s*(.+?)(?=\n[A-Z]|\n\n|$)/gi,
-            (match, header, content) => {
+            (_match: string, header: string, content: string) => {
                 let listContent = content;
                 
                 // Convert number words to list format - capture until next sentence or section
@@ -723,7 +697,7 @@ class DictationCommandProcessor {
         // Look for medication patterns within Current Medications sections
         formatted = formatted.replace(
             /(Current Medications:\s*)(.*?)(?=\n[A-Z]|\n\n|$)/gi,
-            (match, header, content) => {
+            (match: string, header: string, content: string) => {
                 // Clean up the content first
                 const cleanContent = content.replace(/[.,]+$/, ''); // Remove trailing punctuation
                 
@@ -732,8 +706,8 @@ class DictationCommandProcessor {
                 
                 // Filter for medication-like patterns (name + dosage)
                 const medications = parts
-                    .map((part) => part.trim())
-                    .filter((part) => {
+                    .map((part: string) => part.trim())
+                    .filter((part: string) => {
                         // Must contain a drug name and dosage
                         return /[A-Za-z]+\s+\d+(?:\.\d+)?\s*(?:mg|mcg|ml)/i.test(part) ||
                                // OR be a recognized medication name with or without dosage
@@ -742,7 +716,7 @@ class DictationCommandProcessor {
                 
                 if (medications.length > 1) {
                     const formattedMeds = medications
-                        .map((med, i) => `${i + 1}. ${med.trim()}`)
+                        .map((med: string, index: number) => `${index + 1}. ${med.trim()}`)
                         .join('\n');
                     return header + '\n' + formattedMeds;
                 }

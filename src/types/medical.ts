@@ -104,21 +104,20 @@ export type StructuredNoteReport = {
   sectionCoverages: Array<{ key?: string; title: string; coverage: number; details: unknown }>;
 };
 
-export type DictationFormattingResult = {
-  text: string;
-  processed: string;
-  metadata: Record<string, unknown>;
-  segments?: Array<Record<string, unknown>>;
-  method?: string;
-  model?: string;
-  formatted?: boolean;
-};
-
-export type FormatterResponse = DictationFormattingResult & {
-  success: boolean;
+export type FormatterResponseSuccess = {
+  success: true;
   formatted: string;
+  model?: string;
   promptVersion?: string;
   manifest?: unknown;
   verification?: StructuredNoteReport;
-  error?: string;
 };
+
+export type FormatterResponseFailure = {
+  success: false;
+  formatted: string;
+  error?: string;
+  model?: string;
+};
+
+export type FormatterResponse = FormatterResponseSuccess | FormatterResponseFailure;
