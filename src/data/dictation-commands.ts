@@ -1,10 +1,63 @@
-/**
- * Dictation Command Processor for DoctorDictate
- * Converts voice dictation commands to formatted text
- * Enhanced with medical formatting for psychiatric notes
- */
+import type {
+    FormatterResponse,
+    ManifestEntry,
+} from '../types/medical';
+
+type CommandPattern = {
+    pattern: RegExp;
+    replacement: string;
+    command: string;
+    medicalContext?: boolean;
+};
+
+type AppliedCommand = {
+    command: string;
+    replacement: string;
+    count: number;
+};
+
+type CommandApplicationResult = {
+    text: string;
+    commands: AppliedCommand[];
+};
+
+type ProcessedCommandsResult = {
+    original: string;
+    processed: string;
+    commands: AppliedCommand[];
+    commandCount: number;
+};
+
+type MedicalFormatterInstance = {
+    formatMedicalDictation: (text: string, options?: Record<string, unknown>) => Promise<FormatterResponse>;
+};
+
+type MedicalFormattingResult = ProcessedCommandsResult & {
+    improvements: unknown[];
+    method: string;
+    model: string;
+    formatted: boolean;
+}; 
+
+type StructuredDataResult = {
+    fullText: string;
+    sections: Record<string, string>;
+    medications: Array<{ name: string; dosage: string; unit: string; instructions: string }>;
+    timestamp: string;
+};
+
+type MarkVoiceCommandsResult = {
+    text: string;
+    markers: unknown[];
+};
 
 class DictationCommandProcessor {
+    private readonly commands: Record<string, string>;
+
+    private patterns: CommandPattern[] = [];
+
+    private ollamaFormatter: MedicalFormatterInstance | null = null;
+
     constructor() {
         this.ollamaFormatter = null; // Lazy-loaded to avoid circular dependency
         // Define command mappings
@@ -104,10 +157,10 @@ class DictationCommandProcessor {
         this.compilePatterns();
     }
     
-    compilePatterns() {
+    private compilePatterns(): void {
         // Create patterns that match commands with word boundaries
         this.patterns = [];
-        
+
         for (const [command, replacement] of Object.entries(this.commands)) {
             // Create pattern that matches the command as whole words
             // Allow for variations in spacing and capitalization
@@ -133,7 +186,7 @@ class DictationCommandProcessor {
      * @param {string} text - Text to analyze
      * @returns {boolean} - True if dictation commands are detected
      */
-    containsDictationCommands(text) {
+    private containsDictationCommands(text: string): boolean {
         // Define CLEAR dictation command signposts that are unlikely to appear in natural speech
         const dictationSignposts = [
             // Explicit punctuation commands (strong indicators)
@@ -172,11 +225,19 @@ class DictationCommandProcessor {
         
         // Require multiple signposts OR very clear single indicators
         // This reduces false positives from natural medical language
-        return signpostCount >= 2 || 
-               /\bnext paragraph\b/i.test(text) || 
-               /\bopen parenthesis\b/i.test(text) ||
-               /\bclose parenthesis\b/i.test(text) ||
-               /\bfull stop\b/i.test(text);
+        if (signpostCount >= 2) {
+            return true;
+        }
+
+        if (/\bnext paragraph\b/i.test(text)) {
+            return true;
+        }
+
+        return (
+            /\bopen parenthesis\b/i.test(text) ||
+            /\bclose parenthesis\b/i.test(text) ||
+            /\bfull stop\b/i.test(text)
+        );
     }
     
     /**
@@ -184,7 +245,7 @@ class DictationCommandProcessor {
      * @param {string} text - Raw transcribed text
      * @returns {object} - Processed text and list of applied commands
      */
-    processCommands(text) {
+    private processCommands(text: string): ProcessedCommandsResult {
         // First, detect if text contains dictation commands
         if (!this.containsDictationCommands(text)) {
             return {
@@ -204,8 +265,8 @@ class DictationCommandProcessor {
      * @param {string} text - Original text to process
      * @returns {object} - Processing results
      */
-    multiPassProcessing(text) {
-        const appliedCommands = [];
+    private multiPassProcessing(text: string): ProcessedCommandsResult {
+        const appliedCommands: AppliedCommand[] = [];
         let processedText = text;
         
         // PASS 1: Mark and validate voice commands
@@ -215,7 +276,7 @@ class DictationCommandProcessor {
         const punctuationResult = this.applyPunctuationCommands(markedText.text);
         processedText = punctuationResult.text;
         appliedCommands.push(...punctuationResult.commands);
-        
+
         // PASS 3: Apply structural commands (paragraphs, lines)
         const structureResult = this.applyStructureCommands(processedText);
         processedText = structureResult.text;
@@ -235,7 +296,7 @@ class DictationCommandProcessor {
     /**
      * Clean up formatting issues after command processing
      */
-    cleanupFormatting(text) {
+    private cleanupFormatting(text: string): string {
         let cleaned = text;
         
         // Only apply cleanup if text was actually processed (contains replacements)
@@ -268,7 +329,7 @@ class DictationCommandProcessor {
      * Process medical note formatting specifically
      * Enhanced with comprehensive medical formatting including Ollama LLM
      */
-    async processMedicalNote(text) {
+    async processMedicalNote(text: string): Promise<MedicalFormattingResult> {
         console.log('🔍 DICTATION PROCESSOR START:');
         console.log('  Input text:', text.substring(0, 150) + '...');
         
@@ -282,15 +343,18 @@ class DictationCommandProcessor {
         
         // Lazy-load OllamaFormatter to avoid circular dependency
         if (!this.ollamaFormatter) {
-            const { OllamaFormatter } = require('../services/formatting/ollama-formatter.js');
-            this.ollamaFormatter = new OllamaFormatter();
+            const module = (await import('../services/formatting/ollama-formatter.js')) as {
+                OllamaFormatter: new () => MedicalFormatterInstance;
+            };
+            this.ollamaFormatter = new module.OllamaFormatter();
         }
         
-        const medicalResult = await this.ollamaFormatter.formatMedicalDictation(dictationResult.processed);
+        const medicalFormatter = this.ollamaFormatter;
+        const medicalResult = await medicalFormatter.formatMedicalDictation(dictationResult.processed);
         console.log('  Final result success:', medicalResult.success);
         console.log('  Final result:', medicalResult.formatted.substring(0, 150) + '...');
         
-        const finalOutput = {
+        const finalOutput: MedicalFormattingResult & { original: string } = {
             original: text,
             processed: medicalResult.formatted || text,
             commands: dictationResult.commands,
@@ -309,10 +373,11 @@ class DictationCommandProcessor {
     /**
      * Extract structured data from medical note
      */
-    extractStructuredData(text) {
-        const processed = this.processMedicalNote(text).processed;
+    async extractStructuredData(text: string): Promise<StructuredDataResult> {
+        const processedResult = await this.processMedicalNote(text);
+        const processed = processedResult.processed;
         
-        const sections = {};
+        const sections: Record<string, string> = {};
         const sectionRegex = /^([A-Z][^:]+):\s*(.*)$/gm;
         let match;
         
@@ -336,8 +401,8 @@ class DictationCommandProcessor {
     /**
      * Extract medication information from text
      */
-    extractMedications(text) {
-        const medications = [];
+    private extractMedications(text: string): Array<{ name: string; dosage: string; unit: string; instructions: string }> {
+        const medications: Array<{ name: string; dosage: string; unit: string; instructions: string }> = [];
         
         // Pattern for medication: name dosage unit (instructions)
         const medPattern = /([A-Za-z]+)\s+(\d+(?:\.\d+)?)\s*(mg|mcg|ml)\s*(?:\((.*?)\))?/gi;
@@ -360,10 +425,10 @@ class DictationCommandProcessor {
      * @param {string} text - Text to analyze
      * @returns {object} - Marked text and metadata
      */
-    markVoiceCommands(text) {
+    private markVoiceCommands(text: string): MarkVoiceCommandsResult {
         // This pass identifies potential voice commands and marks their confidence
         // For now, we'll keep it simple but this is where we'd add ML classification later
-        return { text: text, markers: [] };
+        return { text, markers: [] };
     }
     
     /**
@@ -371,9 +436,9 @@ class DictationCommandProcessor {
      * @param {string} text - Text to process
      * @returns {object} - Result with applied commands
      */
-    applyPunctuationCommands(text) {
+    private applyPunctuationCommands(text: string): CommandApplicationResult {
         let processedText = text;
-        const appliedCommands = [];
+        const appliedCommands: AppliedCommand[] = [];
         
         // Medical Grammar Rules for Punctuation
         const punctuationRules = [
@@ -430,9 +495,9 @@ class DictationCommandProcessor {
      * @param {string} text - Text to process
      * @returns {object} - Result with applied commands
      */
-    applyStructureCommands(text) {
+    private applyStructureCommands(text: string): CommandApplicationResult {
         let processedText = text;
-        const appliedCommands = [];
+        const appliedCommands: AppliedCommand[] = [];
         
         // Structural commands
         const structureRules = [
@@ -462,7 +527,7 @@ class DictationCommandProcessor {
      * @param {string} text - Text to clean up
      * @returns {string} - Cleaned text
      */
-    medicalFormatCleanup(text) {
+    private medicalFormatCleanup(text: string): string {
         let cleaned = text;
         
         // Medical Grammar Rules
@@ -552,7 +617,7 @@ class DictationCommandProcessor {
      * @param {string} text - Text to format
      * @returns {string} - Formatted text with proper medical lists
      */
-    formatMedicalLists(text) {
+    private formatMedicalLists(text: string): string {
         let formatted = text;
         
         // Pattern 1: Section headers followed by numbered items (most common medical pattern)
@@ -618,8 +683,8 @@ class DictationCommandProcessor {
      * @param {string} text - Text containing numbered items
      * @returns {Array} - Array of item contents
      */
-    extractNumberedItems(text) {
-        const items = [];
+    private extractNumberedItems(text: string): string[] {
+        const items: string[] = [];
         
         // Match patterns like "1) content" or "1. content" or just "content, content"
         const numberPattern = /(\d+[).])\s*([^0-9).]*)(?=\d+[).]|$)/gi;
@@ -634,9 +699,10 @@ class DictationCommandProcessor {
         
         // If no numbered patterns found, try comma-separated items
         if (items.length === 0) {
-            const commaItems = text.split(/,(?![^()]*\))/) // Split on commas not inside parentheses
-                .map(item => item.trim())
-                .filter(item => item.length > 3); // Filter out very short items
+            const commaItems = text
+                .split(/,(?![^()]*\))/) // Split on commas not inside parentheses
+                .map((item) => item.trim())
+                .filter((item) => item.length > 3); // Filter out very short items
             
             if (commaItems.length >= 2) {
                 return commaItems;
@@ -651,7 +717,7 @@ class DictationCommandProcessor {
      * @param {string} text - Text to format
      * @returns {string} - Formatted medication text
      */
-    formatMedicationLists(text) {
+    private formatMedicationLists(text: string): string {
         let formatted = text;
         
         // Look for medication patterns within Current Medications sections
@@ -666,8 +732,8 @@ class DictationCommandProcessor {
                 
                 // Filter for medication-like patterns (name + dosage)
                 const medications = parts
-                    .map(part => part.trim())
-                    .filter(part => {
+                    .map((part) => part.trim())
+                    .filter((part) => {
                         // Must contain a drug name and dosage
                         return /[A-Za-z]+\s+\d+(?:\.\d+)?\s*(?:mg|mcg|ml)/i.test(part) ||
                                // OR be a recognized medication name with or without dosage
@@ -689,5 +755,8 @@ class DictationCommandProcessor {
     }
 }
 
-// Export for use in other modules
-module.exports = { DictationCommandProcessor };
+export { DictationCommandProcessor };
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { DictationCommandProcessor };
+}

@@ -34,8 +34,8 @@ module.exports = {
     '!src/**/*.spec.{js,jsx,ts,tsx}',
     '!src/__tests__/**',
     '!src/__mocks__/**',
-    '!src/main.js', // Electron main process is hard to test in jsdom
-    '!src/preload.js'
+    '!src/main.ts', // Electron main process is hard to test in jsdom
+    '!src/preload.ts'
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],

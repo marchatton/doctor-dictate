@@ -2,17 +2,18 @@
   "name": "doctor-dictate",
   "version": "1.0.0",
   "description": "A desktop application for medical professionals that accurately transcribes clinical dictation locally, optimized for medical terminology.",
-  "main": "src/main.js",
+  "main": "dist-electron/main.js",
   "directories": {
     "doc": "docs"
   },
   "packageManager": "pnpm@10.17.1",
   "scripts": {
-    "start": "electron .",
-    "dev": "concurrently \"pnpm run react:dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "start": "electron -r ts-node/register/transpile-only ./src/main.ts",
+    "dev": "concurrently \"pnpm run react:dev\" \"wait-on http://localhost:5173 && electron -r ts-node/register/transpile-only ./src/main.ts\"",
     "react:dev": "vite",
     "react:build": "vite build",
-    "build": "pnpm run react:build && electron-builder",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build": "pnpm run react:build && pnpm run build:electron && electron-builder",
     "build:css": "echo 'CSS already built manually'",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
@@ -69,7 +70,8 @@
     "ts-jest": "^29.4.1",
     "typescript": "^5.5.4",
     "vite": "^5.2.0",
-    "wait-on": "^8.0.0"
+    "wait-on": "^8.0.0",
+    "ts-node": "^10.9.2"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
@@ -92,6 +94,7 @@
     },
     "files": [
       "src/**/*",
+      "dist-electron/**/*",
       "node_modules/**/*",
       "package.json"
     ],

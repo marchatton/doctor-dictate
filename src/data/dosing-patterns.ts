@@ -168,7 +168,7 @@ const dosingPatterns = {
  * @param {string} text - Text to check
  * @returns {boolean} - True if contains dosing language
  */
-function containsDosingLanguage(text) {
+function containsDosingLanguage(text: string): boolean {
   const dosingKeywords = [
     'pill', 'tablet', 'capsule', 'mg', 'ml', 'daily', 'twice',
     'three times', 'four times', 'as needed', 'PRN', 'QHS',
@@ -186,7 +186,7 @@ function containsDosingLanguage(text) {
  * @param {string} frequency - Frequency/instructions
  * @returns {string} - Formatted medication entry
  */
-function formatMedicationDosing(medication, frequency) {
+function formatMedicationDosing(medication: string, frequency: string): string {
   // Ensure mg abbreviation
   medication = medication.replace(/\bmilligrams?\b/gi, 'mg');
   medication = medication.replace(/\bmicrograms?\b/gi, 'mcg');
@@ -196,8 +196,15 @@ function formatMedicationDosing(medication, frequency) {
   return `${medication} (${frequency})`;
 }
 
-module.exports = {
-  dosingPatterns,
-  containsDosingLanguage,
-  formatMedicationDosing
-};
+type DosingPatterns = typeof dosingPatterns;
+
+export { dosingPatterns, containsDosingLanguage, formatMedicationDosing };
+export type { DosingPatterns };
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    dosingPatterns,
+    containsDosingLanguage,
+    formatMedicationDosing,
+  };
+}

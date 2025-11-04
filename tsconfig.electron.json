@@ -1,0 +1,47 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "outDir": "dist-electron",
+    "rootDir": "src",
+    "isolatedModules": false,
+    "noEmit": false,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": false,
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "baseUrl": "./",
+    "paths": {
+      "whisper-node": ["src/types/stubs/whisper-node"],
+      "pdfkit": ["src/types/stubs/pdfkit"]
+    }
+  },
+  "include": [
+    "src/main.ts",
+    "src/preload.ts",
+    "src/services/**/*.ts",
+    "src/services/**/*.tsx",
+    "src/services/**/*.d.ts",
+    "src/utils/**/*.ts",
+    "src/utils/**/*.tsx",
+    "src/utils/**/*.d.ts",
+    "src/data/**/*.ts",
+    "src/data/**/*.d.ts",
+    "src/prompts/**/*.ts",
+    "src/prompts/**/*.d.ts",
+    "src/types/**/*.ts",
+    "src/types/**/*.d.ts"
+  ],
+  "exclude": [
+    "src/**/__tests__/**",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx"
+  ]
+}

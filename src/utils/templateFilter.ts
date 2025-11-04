@@ -6,7 +6,6 @@
 interface TemplateFilterOptions {
   removeEmptySections?: boolean;
   removePlaceholders?: boolean;
-  removeHeaders?: boolean;
 }
 
 // Patterns that indicate template/placeholder content
@@ -27,7 +26,7 @@ const PLACEHOLDER_PATTERNS = [
 ];
 
 // Section headers that should be removed if they have no content
-const EMPTY_SECTION_PATTERNS = [
+export const EMPTY_SECTION_PATTERNS = [
   /^##\s+.*?\n(?=\s*$|\n##|\n#)/gm, // Empty markdown sections
   /^\*\*.*?\*\*\s*\n(?=\s*$|\n\*\*|\n#)/gm, // Empty bold sections
 ];
@@ -45,7 +44,6 @@ export function filterTemplate(text: string, options: TemplateFilterOptions = {}
   const {
     removeEmptySections = true,
     removePlaceholders = true,
-    removeHeaders = false
   } = options;
 
   let cleaned = text;
@@ -251,8 +249,6 @@ export function extractPatientName(text: string): string {
   for (const pattern of namePatterns) {
     const matches = text.match(pattern);
     if (matches && matches.length > 0) {
-      // Extract the name from the first match
-      const match = matches[0];
       const nameMatch = pattern.exec(text);
       if (nameMatch && nameMatch[1]) {
         const name = nameMatch[1].trim();

@@ -1,9 +1,56 @@
+type ManifestEntry = {
+  key?: string;
+  title?: string;
+  detectedTitle?: string;
+  contentRange?: {
+    start?: number;
+    end?: number;
+  };
+  [key: string]: unknown;
+};
+
+type ManifestShape = {
+  entries?: ManifestEntry[];
+};
+
+type StructuredSection = {
+  key: string;
+  body?: string;
+  manifestEntry?: { format?: string };
+};
+
+type StructuredPayload = {
+  sections?: StructuredSection[];
+};
+
+type VerificationCoverageDetails = {
+  isValid: boolean;
+  coverage: number;
+  coveragePercent: string;
+  missingWords: string[];
+  missingSentences: Array<{ text: string; missingWords: string[]; position: number }>;
+  foundWords: number;
+  totalWords: number;
+};
+
+type StructuredNoteReport = {
+  isValid: boolean;
+  missingSections: string[];
+  extraSections: string[];
+  coverageIssues: Array<{ key?: string; title: string; coverage: number; missingSentences: Array<{ text: string; missingWords: string[]; position: number }> }>;
+  sectionCoverages: Array<{ key?: string; title: string; coverage: number; details: VerificationCoverageDetails }>;
+};
+
 /**
  * Content Verification and Recovery System
  * Ensures no content is lost during medical transcription formatting
  */
 
 class ContentVerifier {
+    private readonly minWordLength: number;
+
+    private readonly minCoverage: number;
+
     constructor() {
         this.minWordLength = 5;  // Ignore small words like "a", "the", "is"
         this.minCoverage = 0.8;   // Require 80% of significant words
@@ -14,8 +61,18 @@ class ContentVerifier {
      * Ensures each manifest section appears, unexpected sections are flagged,
      * and key phrases survive within each section body.
      */
-    verifyStructuredNote({ dictationText = '', manifest = { entries: [] }, markdown = '', structured = {} }) {
-        const report = {
+    verifyStructuredNote({
+        dictationText = '',
+        manifest = { entries: [] },
+        markdown = '',
+        structured = {},
+    }: {
+        dictationText?: string;
+        manifest?: ManifestShape;
+        markdown?: string;
+        structured?: StructuredPayload;
+    }): StructuredNoteReport {
+        const report: StructuredNoteReport = {
             isValid: true,
             missingSections: [],
             extraSections: [],
@@ -24,7 +81,7 @@ class ContentVerifier {
         };
 
         const headings = this.extractHeadings(markdown);
-        const manifestEntries = manifest.entries || [];
+        const manifestEntries = manifest.entries ?? [];
         const manifestTitles = manifestEntries.map((entry) => (entry.title || entry.detectedTitle || entry.key || '').trim());
         const manifestTitleSet = new Set(manifestTitles.map((title) => title.toLowerCase()));
 
@@ -37,7 +94,7 @@ class ContentVerifier {
             }
 
             const snippet = this.extractManifestSnippet(dictationText, entry);
-            const structuredSection = (structured.sections || []).find((section) => section.key === entry.key);
+            const structuredSection = (structured.sections ?? []).find((section) => section.key === entry.key);
             const sectionBody = structuredSection?.body || '';
             if (snippet && sectionBody) {
                 const coverageResult = this.verifyContent(snippet, sectionBody);
@@ -75,14 +132,14 @@ class ContentVerifier {
      * Check if formatted output contains sufficient content from input
      * @returns {Object} { isValid, coverage, missingWords, missingSentences }
      */
-    verifyContent(input, output) {
+    verifyContent(input: string, output: string): VerificationCoverageDetails {
         // Extract significant words from input
         const inputWords = this.extractSignificantWords(input);
         const outputLower = output.toLowerCase();
         
         // Check which words are present in output
-        const foundWords = new Set();
-        const missingWords = [];
+        const foundWords = new Set<string>();
+        const missingWords: string[] = [];
         
         for (const word of inputWords) {
             if (outputLower.includes(word.toLowerCase())) {
@@ -98,17 +155,17 @@ class ContentVerifier {
             : 1;
         
         // Find missing sentences if coverage is low
-        let missingSentences = [];
+        let missingSentences: Array<{ text: string; missingWords: string[]; position: number }> = [];
         if (coverage < this.minCoverage) {
             missingSentences = this.findMissingSentences(input, output, missingWords);
         }
         
         return {
             isValid: coverage >= this.minCoverage,
-            coverage: coverage,
+            coverage,
             coveragePercent: `${(coverage * 100).toFixed(1)}%`,
-            missingWords: missingWords,
-            missingSentences: missingSentences,
+            missingWords,
+            missingSentences,
             foundWords: foundWords.size,
             totalWords: inputWords.length
         };
@@ -117,7 +174,7 @@ class ContentVerifier {
     /**
      * Extract significant words (5+ characters) from text
      */
-    extractSignificantWords(text) {
+    extractSignificantWords(text: string): string[] {
         const words = text.match(new RegExp(`\\b\\w{${this.minWordLength},}\\b`, 'g')) || [];
         // Remove duplicates but keep track of original
         return [...new Set(words)];
@@ -126,19 +183,17 @@ class ContentVerifier {
     /**
      * Find complete sentences that might be missing
      */
-    findMissingSentences(input, output, missingWords) {
+    findMissingSentences(input: string, output: string, missingWords: string[]): Array<{ text: string; missingWords: string[]; position: number }> {
         const sentences = this.splitIntoSentences(input);
         const outputLower = output.toLowerCase();
-        const missingSentences = [];
+        const missingSentences: Array<{ text: string; missingWords: string[]; position: number }> = [];
         
         for (const sentence of sentences) {
             const sentenceWords = this.extractSignificantWords(sentence);
             if (sentenceWords.length === 0) continue;
             
             // Check how many words from this sentence are missing
-            const missingFromSentence = sentenceWords.filter(word => 
-                missingWords.includes(word)
-            );
+            const missingFromSentence = sentenceWords.filter((word) => missingWords.includes(word));
             
             // If >50% of sentence's words are missing, sentence is likely missing
             if (missingFromSentence.length > sentenceWords.length * 0.5) {
@@ -160,7 +215,7 @@ class ContentVerifier {
     /**
      * Split text into sentences, handling medical dictation format
      */
-    splitIntoSentences(text) {
+    splitIntoSentences(text: string): string[] {
         if (!text) {
             return [];
         }
@@ -177,15 +232,15 @@ class ContentVerifier {
         const sentences = normalized.match(/[^.?!]+[.?!]|[^.?!]+$/g) || [];
 
         return sentences
-            .map(sentence => sentence.trim())
-            .filter(sentence => sentence.length > 10);
+            .map((sentence) => sentence.trim())
+            .filter((sentence) => sentence.length > 10);
     }
 
     /**
      * Get a unique 3-4 word phrase from sentence for verification
      */
-    getUniquePhrase(sentence) {
-        const words = sentence.split(/\s+/).filter(w => w.length > 3);
+    getUniquePhrase(sentence: string): string | null {
+        const words = sentence.split(/\s+/).filter((w) => w.length > 3);
         if (words.length >= 3) {
             // Take 3 consecutive words from middle of sentence
             const start = Math.floor(words.length / 2) - 1;
@@ -197,8 +252,8 @@ class ContentVerifier {
     /**
      * Generate a detailed report of verification results
      */
-    generateReport(verificationResult) {
-        const report = [];
+    generateReport(verificationResult: VerificationCoverageDetails): string {
+        const report: string[] = [];
         
         report.push('\n📊 CONTENT VERIFICATION REPORT');
         report.push('=' .repeat(50));
@@ -232,8 +287,8 @@ class ContentVerifier {
         return report.join('\n');
     }
 
-    extractHeadings(markdown) {
-        const headings = [];
+    extractHeadings(markdown: string): string[] {
+        const headings: string[] = [];
         const regex = /^#+\s+(.+)$/gm;
         let match;
         while ((match = regex.exec(markdown)) !== null) {
@@ -243,7 +298,7 @@ class ContentVerifier {
         return headings;
     }
 
-    extractManifestSnippet(dictationText, entry) {
+    extractManifestSnippet(dictationText: string, entry: ManifestEntry): string {
         if (!dictationText) return '';
         const range = entry.contentRange || {};
         const { start, end } = range;
@@ -264,4 +319,8 @@ class ContentVerifier {
     }
 }
 
-module.exports = { ContentVerifier };
+export { ContentVerifier };
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { ContentVerifier };
+}

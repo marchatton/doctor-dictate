@@ -1,9 +1,17 @@
+import type {
+  MedicalDictionary,
+  MedicationCategoryMap,
+  MedicationEntry,
+  TranscriptionAccuracyResult,
+  TranscriptionCorrection,
+} from '../types/medical';
+
 // Local Medical Dictionary for DoctorDictate
 // Contains psychiatric medications, conditions, and terminology
 // All data stored locally - no external dependencies
 // THIS IS THE SINGLE SOURCE OF TRUTH FOR MEDICAL CORRECTIONS
 
-const medicalDictionary = {
+const medicalDictionary: MedicalDictionary = {
   // Important medication preservation rule
   preservationRules: {
     medications: "NEVER swap brand names with generics or vice versa",
@@ -733,7 +741,7 @@ const medicalDictionary = {
   // Validation functions
   validate: {
     // Check if a medication name exists in the dictionary (including errors)
-    isMedication: (name) => {
+    isMedication: (name: string): boolean => {
       const normalizedName = name.toLowerCase().trim();
       
       // Direct match
@@ -754,7 +762,7 @@ const medicalDictionary = {
     },
 
     // Get medication info including error corrections
-    getMedicationInfo: (name) => {
+    getMedicationInfo: (name: string): (MedicationEntry & { correctedName?: string; wasError?: boolean }) | null => {
       const normalizedName = name.toLowerCase().trim();
       
       // Direct match
@@ -781,7 +789,7 @@ const medicalDictionary = {
     },
 
     // Check if a dosage format is valid (including common errors)
-    isValidDosage: (dosage) => {
+    isValidDosage: (dosage: string): boolean => {
       const normalizedDosage = dosage.toLowerCase().trim();
       
       // Standard format
@@ -799,7 +807,7 @@ const medicalDictionary = {
     },
 
     // Get corrected medication name from error
-    getCorrectedMedicationName: (errorName) => {
+    getCorrectedMedicationName: (errorName: string): string | null => {
       const normalizedError = errorName.toLowerCase().trim();
       
       for (const category of Object.values(medicalDictionary.medications)) {
@@ -814,7 +822,7 @@ const medicalDictionary = {
     },
 
     // Get corrected dosage format
-    getCorrectedDosage: (dosage) => {
+    getCorrectedDosage: (dosage: string): string => {
       const normalizedDosage = dosage.toLowerCase().trim();
       
       // Remove common errors
@@ -830,9 +838,9 @@ const medicalDictionary = {
     },
 
     // Check if text contains transcription errors and suggest corrections
-    checkTranscriptionErrors: (text) => {
+    checkTranscriptionErrors: (text: string): TranscriptionCorrection[] => {
       const words = text.toLowerCase().split(/\s+/);
-      const corrections = [];
+      const corrections: TranscriptionCorrection[] = [];
       
       for (const word of words) {
         // Check medication name errors
@@ -864,10 +872,10 @@ const medicalDictionary = {
     },
 
     // Get accuracy score for transcription
-    getTranscriptionAccuracy: (transcript, expectedTerms) => {
+    getTranscriptionAccuracy: (transcript: string, expectedTerms: string[]): TranscriptionAccuracyResult => {
       let correctCount = 0;
       const totalCount = expectedTerms.length;
-      const corrections = [];
+      let corrections: TranscriptionCorrection[] = [];
       
       for (const expectedTerm of expectedTerms) {
         const normalizedExpected = expectedTerm.toLowerCase();
@@ -878,15 +886,17 @@ const medicalDictionary = {
         } else {
           // Check for common errors
           const errorCorrections = medicalDictionary.validate.checkTranscriptionErrors(transcript);
-          const hasCorrection = errorCorrections.some(corr => 
+          const hasCorrection = errorCorrections.some((corr) =>
             corr.corrected.toLowerCase() === normalizedExpected
           );
           
           if (hasCorrection) {
             correctCount++;
-            corrections.push(...errorCorrections.filter(corr => 
-              corr.corrected.toLowerCase() === normalizedExpected
-            ));
+            corrections = corrections.concat(
+              errorCorrections.filter((corr) =>
+                corr.corrected.toLowerCase() === normalizedExpected
+              )
+            );
           }
         }
       }
@@ -897,13 +907,13 @@ const medicalDictionary = {
         accuracy: accuracy,
         correctCount: correctCount,
         totalCount: totalCount,
-        corrections: corrections,
+        corrections,
         passed: accuracy >= 95
       };
     },
 
     // Check if a condition exists
-    isCondition: (name) => {
+    isCondition: (name: string): boolean => {
       const normalizedName = name.toLowerCase().trim();
       for (const category of Object.values(medicalDictionary.conditions)) {
         if (normalizedName in category) return true;
@@ -912,7 +922,7 @@ const medicalDictionary = {
     },
 
     // Get condition information
-    getConditionInfo: (name) => {
+    getConditionInfo: (name: string): Record<string, unknown> | null => {
       const normalizedName = name.toLowerCase().trim();
       for (const category of Object.values(medicalDictionary.conditions)) {
         if (normalizedName in category) {
@@ -923,36 +933,39 @@ const medicalDictionary = {
     },
 
     // Get all medications in a category
-    getMedicationsByCategory: (category) => {
-      return medicalDictionary.medications[category] || {};
+    getMedicationsByCategory: (category: string): MedicationCategoryMap => {
+      return medicalDictionary.medications[category] ?? {};
     },
 
     // Search medications by partial name
-    searchMedications: (query) => {
-      const results = [];
+    searchMedications: (query: string): Array<MedicationEntry & { name: string; category: string }> => {
+      const results: Array<MedicationEntry & { name: string; category: string }> = [];
       const normalizedQuery = query.toLowerCase().trim();
       
-      for (const [categoryName, category] of Object.entries(medicalDictionary.medications)) {
-        for (const [medName, medInfo] of Object.entries(category)) {
-          if (medName.includes(normalizedQuery) || 
-              medInfo.brandNames.some(brand => brand.toLowerCase().includes(normalizedQuery))) {
+      Object.entries(medicalDictionary.medications).forEach(([categoryName, category]) => {
+        Object.entries(category).forEach(([medName, medInfo]) => {
+          const brandNames = medInfo.brandNames ?? [];
+          const nameMatches = medName.includes(normalizedQuery);
+          const brandMatches = brandNames.some((brand) => brand.toLowerCase().includes(normalizedQuery));
+
+          if (nameMatches || brandMatches) {
             results.push({
               name: medName,
               category: categoryName,
-              ...medInfo
+              ...medInfo,
             });
           }
-        }
-      }
-      
+        });
+      });
+
       return results;
     }
   }
 };
 
-// Export for use in other modules
+export default medicalDictionary;
+export { medicalDictionary };
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = medicalDictionary;
-} else if (typeof window !== 'undefined') {
-  window.medicalDictionary = medicalDictionary;
 }

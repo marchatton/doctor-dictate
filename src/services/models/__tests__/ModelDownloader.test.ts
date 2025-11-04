@@ -1,16 +1,16 @@
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const { createHash } = require('crypto');
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { createHash } from 'crypto';
 
-const { ModelDownloader } = require('../ModelDownloader');
+import { ModelDownloader } from '../ModelDownloader';
 
-function createTempDir() {
+function createTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'model-downloader-'));
 }
 
 describe('ModelDownloader', () => {
-  let tmpDir;
+  let tmpDir: string;
 
   beforeEach(() => {
     tmpDir = createTempDir();
@@ -38,7 +38,7 @@ describe('ModelDownloader', () => {
       arrayBuffer: async () => Buffer.from('mock-model'),
     }));
 
-    const downloader = new ModelDownloader({ models, fetch: fetchMock });
+    const downloader = new ModelDownloader({ models, fetch: fetchMock as unknown as typeof fetch });
 
     const results = await downloader.ensureModels();
 
@@ -68,7 +68,7 @@ describe('ModelDownloader', () => {
 
     const fetchMock = jest.fn();
 
-    const downloader = new ModelDownloader({ models, fetch: fetchMock });
+    const downloader = new ModelDownloader({ models, fetch: fetchMock as unknown as typeof fetch });
     const results = await downloader.ensureModels();
 
     expect(fetchMock).not.toHaveBeenCalled();

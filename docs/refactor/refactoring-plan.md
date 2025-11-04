@@ -74,6 +74,7 @@ src/services/
 - `src/medical-formatter.js` → `src/services/formatting/medical-formatter.js` (consider removing if obsolete)
 - `src/content-verifier.js` → `src/services/formatting/content-verifier.js`
 - Create `src/services/formatting/simple-formatter.js` (fallback)
+- Align structure metadata with assembler expectations: prefer token indices (or identical pre-normalization) so Stage 2 slicing never drifts after deterministic cleanup.
 
 #### 1.4 Processing Services
 **Move to `src/services/processing/`:**

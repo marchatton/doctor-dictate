@@ -1,16 +1,16 @@
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const { createHash } = require('crypto');
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { createHash } from 'crypto';
 
-const { ModelValidator } = require('../ModelValidator');
+import { ModelValidator } from '../ModelValidator';
 
-function createTempDir() {
+function createTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'model-validator-'));
 }
 
 describe('ModelValidator', () => {
-  let tmpDir;
+  let tmpDir: string;
 
   beforeEach(() => {
     tmpDir = createTempDir();
@@ -70,6 +70,6 @@ describe('ModelValidator', () => {
       key: 'missing',
       valid: false,
     });
-    expect(results[0].reason).toMatch(/missing|checksum/i);
+    expect(results[0]?.reason).toMatch(/missing|checksum/i);
   });
 });

@@ -3,11 +3,12 @@
  * Handles audio transcription with medical dictionary post-processing
  */
 
-const { spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs');
-const medicalDictionary = require('../../data/medical-dictionary.js');
-const { DictationCommandProcessor } = require('../../data/dictation-commands.js');
+import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+
+import medicalDictionary from '../../data/medical-dictionary';
+import { DictationCommandProcessor } from '../../data/dictation-commands';
 const { AudioProcessor } = require('../audio/processor.js');
 const { TranscriptionProgress } = require('./progress-tracker.js');
 
@@ -587,4 +588,8 @@ function escapeRegExp(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-module.exports = { WhisperTranscriber };
+export { WhisperTranscriber };
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { WhisperTranscriber };
+}
