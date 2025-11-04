@@ -18,9 +18,12 @@ export function Modal({
   confirmText = 'Confirm'
 }: ModalProps) {
   if (!isOpen) return null;
-  return <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-[fadeIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
-        <h3 className="text-xl font-serif font-semibold text-stone-900 mb-2">
+  /* eslint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */
+  return <>
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-40" role="presentation" aria-hidden="true" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="presentation">
+        <div role="dialog" aria-modal="true" aria-labelledby="modal-title" className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-[fadeIn_0.2s_ease-out]" onClick={event => event.stopPropagation()}>
+        <h3 id="modal-title" className="text-xl font-serif font-semibold text-stone-900 mb-2">
           {title}
         </h3>
         <p className="text-stone-600 mb-6">{message}</p>
@@ -32,6 +35,8 @@ export function Modal({
             {cancelText}
           </button>
         </div>
+        </div>
       </div>
-    </div>;
+    </>;
+  /* eslint-enable jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */
 }

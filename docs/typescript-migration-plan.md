@@ -15,8 +15,8 @@ All items below are currently **Todo** unless marked otherwise.
 ## 1. Tooling & Configuration — **Status: In Progress**
 - [x] Harden TypeScript coverage in `tsconfig.json`/`tsconfig.node.json`, Jest, and Vite configs.
 - [x] Add ambient declarations for preload bridges, assets, and Tailwind modules. _(New `src/types/global.d.ts` + IPC typings.)_
-- [ ] Refresh ESLint/Jest settings for TypeScript-first sources; configure `ts-jest` or equivalent. _(Jest already uses `ts-jest`, but `.eslintrc.js` still targets plain JS.)_
-- [ ] Replace remaining CommonJS `require` usage with ESM imports. _(Multiple modules under `src/data` and `src/prompts` still call `require()`.)_
+- [x] Refresh ESLint/Jest settings for TypeScript-first sources; configure `ts-jest` or equivalent. _(.eslintrc now uses `@typescript-eslint`, React, hooks, a11y, import, and Jest/testing-library plugins with TypeScript resolver + overrides.)_
+- [ ] Replace remaining CommonJS `require` usage with ESM imports. _(Legacy transcription manager/engine modules still emit CommonJS and need conversion.)_
 - [x] Validate with `pnpm run lint` and `pnpm test` after updates.
 
 ## 2. Electron Entrypoints (`src/main`, `src/preload`, renderer bootstrap`) — **Status: In Progress**

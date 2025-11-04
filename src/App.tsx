@@ -4,6 +4,39 @@ import { RecordingScreen } from './components/RecordingScreen';
 import { ProcessingScreen } from './components/ProcessingScreen';
 import { TranscriptScreen } from './components/TranscriptScreen';
 import { useElectronAPI } from './hooks/useElectronAPI';
+
+type CorrectionDetails = { original: string; corrected: string; context: string };
+
+type BackendMetadata = {
+  duration?: number;
+  correctionCount?: number;
+  mode?: string;
+  formatting?: Record<string, unknown>;
+  modeDecision?: Record<string, unknown>;
+};
+
+type BackendTranscript = {
+  transcript?: string;
+  formatted?: string;
+  corrected?: string;
+  raw?: string;
+  corrections?: CorrectionDetails[];
+  medications?: string[];
+  metadata?: BackendMetadata;
+};
+
+type TranscriptResult = string | BackendTranscript;
+
+type RecordingMetadata = {
+  duration: number;
+  medicalTermsCount: number;
+  correctionsCount: number;
+  corrections: CorrectionDetails[];
+  medications: string[];
+  mode: string;
+  formattingMetadata?: Record<string, unknown>;
+  modeDecision?: Record<string, unknown>;
+};
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('recording'); // 'recording', 'processing', 'transcript'
   const defaultModes = [
@@ -34,7 +67,7 @@ export default function App() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [patientName, setPatientName] = useState('Unknown');
+  const [patientName] = useState('Unknown');
   const [processingStep, setProcessingStep] = useState('audio');
   const [processingProgress, setProcessingProgress] = useState(0);
   const { listTranscriptionModes } = useElectronAPI();
@@ -65,15 +98,13 @@ export default function App() {
   }, [listTranscriptionModes, selectedMode]);
 
   // Recording metadata
-  const [recordingMetadata, setRecordingMetadata] = useState({
+  const [recordingMetadata, setRecordingMetadata] = useState<RecordingMetadata>({
     duration: 0,
     medicalTermsCount: 0,
     correctionsCount: 0,
-    corrections: [] as {original: string, corrected: string, context: string}[],
-    medications: [] as string[],
+    corrections: [],
+    medications: [],
     mode: 'auto',
-    formattingMetadata: undefined as Record<string, unknown> | undefined,
-    modeDecision: undefined as Record<string, unknown> | undefined,
   });
   const handleStartRecording = () => {
     setIsRecording(true);
@@ -103,24 +134,28 @@ export default function App() {
     }
   };
 
-  const handleTranscriptionComplete = (transcriptData: any) => {
+  const handleTranscriptionComplete = (transcriptData: TranscriptResult) => {
     // Handle both old string format and new object format
     let transcriptText = '';
-    let metadata = {
+    const metadata: RecordingMetadata = {
       duration: recordingTime,
       medicalTermsCount: 0,
       correctionsCount: 0,
-      corrections: [] as {original: string, corrected: string, context: string}[],
-      medications: [] as string[],
+      corrections: [],
+      medications: [],
       mode: selectedMode,
-      formattingMetadata: undefined as Record<string, unknown> | undefined,
     };
     let modeUsed = selectedMode;
 
     if (typeof transcriptData === 'string') {
       transcriptText = transcriptData;
     } else if (transcriptData && typeof transcriptData === 'object') {
-      transcriptText = transcriptData.transcript || transcriptData.formatted || transcriptData.corrected || transcriptData.raw || '';
+      transcriptText =
+        transcriptData.transcript ||
+        transcriptData.formatted ||
+        transcriptData.corrected ||
+        transcriptData.raw ||
+        '';
       
       // Extract metadata from backend result
       if (transcriptData.corrections) {
@@ -132,23 +167,24 @@ export default function App() {
         metadata.medicalTermsCount = transcriptData.medications.length;
       }
       if (transcriptData.metadata) {
-        metadata.duration = transcriptData.metadata.duration || recordingTime;
-        metadata.correctionsCount = transcriptData.metadata.correctionCount || metadata.correctionsCount;
-        if (transcriptData.metadata.mode) {
-          modeUsed = transcriptData.metadata.mode;
+        const meta = transcriptData.metadata;
+        metadata.duration = meta.duration || recordingTime;
+        metadata.correctionsCount = meta.correctionCount || metadata.correctionsCount;
+        if (meta.mode) {
+          modeUsed = meta.mode;
+          metadata.mode = meta.mode;
         }
-        if (transcriptData.metadata.formatting) {
-          metadata.formattingMetadata = transcriptData.metadata.formatting as Record<string, unknown>;
+        if (meta.formatting) {
+          metadata.formattingMetadata = meta.formatting;
         }
-        if (transcriptData.metadata.modeDecision) {
-          setModeDecision(transcriptData.metadata.modeDecision as Record<string, unknown>);
-          metadata.modeDecision = transcriptData.metadata.modeDecision as Record<string, unknown>;
+        if (meta.modeDecision) {
+          setModeDecision(meta.modeDecision);
+          metadata.modeDecision = meta.modeDecision;
         }
       }
     }
 
     setResolvedMode(modeUsed);
-    metadata.mode = modeUsed;
     setTranscript(transcriptText);
     setRecordingMetadata(metadata);
     if (modeUsed && modeUsed !== selectedMode && selectedMode !== 'auto') {

@@ -1,10 +1,14 @@
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import medicalDictionaryData from '../../data/medical-dictionary';
 import { DictationCommandProcessor } from '../../data/dictation-commands';
 import type { MedicalDictionary } from '../../types/medical';
+import { AudioProcessor } from '../audio/processor.js';
+import { WhisperCpp } from './whisper-cpp.js';
+import { TranscriptionProgress } from './progress-tracker.js';
 
 type AvailableModelInfo = {
     name: string;
@@ -62,21 +66,9 @@ type AudioProcessorLike = {
     cleanup(chunks: TranscriptionChunk[]): Promise<void>;
 };
 
-type AudioProcessorCtor = new () => AudioProcessorLike;
-
-type TranscriptionProgressLike = {
-    setModel(model: string): void;
-    nextStage(stage: string): void;
-    getProgress(stage?: string, percent?: number): unknown;
-    complete(): unknown;
-};
-
-type TranscriptionProgressCtor = new (duration: number) => TranscriptionProgressLike;
+type TranscriptionProgressLike = InstanceType<typeof TranscriptionProgress>;
 
 type ProgressCallback = ((progress: unknown) => void) | null;
-
-const { AudioProcessor }: { AudioProcessor: AudioProcessorCtor } = require('../audio/processor.js');
-const { TranscriptionProgress }: { TranscriptionProgress: TranscriptionProgressCtor } = require('./progress-tracker.js');
 
 const medicalDictionary = medicalDictionaryData as MedicalDictionary;
 
@@ -110,7 +102,6 @@ class WhisperTranscriber {
     async initializeWhisper(): Promise<boolean> {
         try {
             // Check if whisper-cpp is available
-            const { execSync } = require('child_process');
             try {
                 execSync('which whisper-cpp', { stdio: 'ignore' });
                 this.whisperEnvPath = 'whisper-cpp'; // Just a flag that it's available
@@ -121,7 +112,7 @@ class WhisperTranscriber {
             }
 
             // Check if models exist
-            const modelsPath = path.join(require('os').homedir(), '.whisper-cpp', 'models');
+            const modelsPath = path.join(os.homedir(), '.whisper-cpp', 'models');
             if (fs.existsSync(modelsPath)) {
                 this.whisperEnvPath = 'whisper-models'; // Flag that models exist
                 console.log('Whisper models found at:', modelsPath);
@@ -333,7 +324,7 @@ class WhisperTranscriber {
         } catch (error) {
             // Cleanup on error
             if (processedAudio && processedAudio.chunks) {
-            await this.audioProcessor.cleanup(processedAudio.chunks);
+                await this.audioProcessor.cleanup(processedAudio.chunks);
             }
             throw error;
         } finally {
@@ -347,8 +338,6 @@ class WhisperTranscriber {
      */
     async runWhisper(audioFilePath: string): Promise<string> {
         // Use WhisperCpp service instead of Python
-        const { WhisperCpp } = require('./whisper-cpp');
-        
         try {
             // Set the model based on selectedModel
             const modelMap: Record<string, string> = {
@@ -628,7 +617,6 @@ class WhisperTranscriber {
         totalChunks: number,
     ): Promise<void> {
         try {
-            const os = require('os');
             const timestamp = Date.now();
             const progressFile = path.join(os.tmpdir(), `doctordictate-progress-${timestamp}.json`);
             
@@ -660,7 +648,6 @@ class WhisperTranscriber {
      */
     cleanupOldProgressFiles(): void {
         try {
-            const os = require('os');
             const tmpDir = os.tmpdir();
             const progressFiles = fs.readdirSync(tmpDir)
                 .filter((file: string) => file.startsWith('doctordictate-progress-'))
