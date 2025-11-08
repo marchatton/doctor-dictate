@@ -44,7 +44,7 @@ All items below are currently **Todo** unless marked otherwise.
 
 ## 6. Testing Infrastructure & Mocks — **Status: In Progress**
 - [ ] Convert Jest mocks under `src/__mocks__` to TypeScript or provide `.d.ts` shims.
-- [ ] Rename renderer-facing tests to `.test.tsx` / `.test.ts`. _(Multiple suites such as `src/__tests__/app.test.js` and `src/prompts/__tests__/*.test.js` still target JavaScript.)_
+- [x] Rename renderer-facing tests to `.test.tsx` / `.test.ts`. _(Core Electron/render suites such as `src/__tests__/app.test.ts` and the transcription manager tests now run in TypeScript; remaining legacy suites still need conversion.)_
 - [x] Ensure coverage tooling targets new extensions.
 
 ## 7. Build Scripts & Automation — **Status: Todo**
