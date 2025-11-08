@@ -1,10 +1,60 @@
-const fs = require('fs');
-const os = require('os');
-const { AudioProcessor } = require('../../../audio/processor.js');
+import fs from 'fs';
+import os from 'os';
 
-class SmartModeSelector {
-  constructor(options = {}) {
-    this.modes = options.modes || null;
+import AudioProcessor from '../../../audio/processor';
+
+type AudioInsights = {
+  fileSizeBytes?: number;
+  durationSeconds?: number;
+};
+
+type SystemInsights = {
+  totalMemMB?: number;
+  freeMemMB?: number;
+  cpuCount?: number;
+};
+
+export type ModeDecision = {
+  mode: string;
+  reason: string;
+  heuristics: {
+    audio: AudioInsights;
+    system: SystemInsights;
+    overrides: Record<string, unknown>;
+  };
+};
+
+type SmartModeSelectorOptions = {
+  modes?: Map<string, { key: string }>;
+  audioProcessor?: AudioProcessor;
+  thresholds?: Partial<{
+    longDurationSeconds: number;
+    mediumDurationSeconds: number;
+    shortDurationSeconds: number;
+    largeFileBytes: number;
+    lowMemoryMB: number;
+    lowFreeMemoryMB: number;
+  }>;
+  audioInsights?: (audioPath: string) => Promise<AudioInsights>;
+  systemInsights?: () => Promise<SystemInsights>;
+  onDecision?: (decision: ModeDecision) => void;
+};
+
+export class SmartModeSelector {
+  modes?: Map<string, { key: string }>;
+
+  private readonly audioProcessor: AudioProcessor;
+
+  readonly thresholds: Required<NonNullable<SmartModeSelectorOptions['thresholds']>>;
+
+  private readonly audioInsights: (audioPath: string) => Promise<AudioInsights>;
+
+  private readonly systemInsights: () => Promise<SystemInsights>;
+
+  private readonly onDecision?: (decision: ModeDecision) => void;
+
+  constructor(options: SmartModeSelectorOptions = {}) {
+    this.modes = options.modes;
     this.audioProcessor = options.audioProcessor || new AudioProcessor();
     this.thresholds = {
       longDurationSeconds: 1800,
@@ -14,43 +64,46 @@ class SmartModeSelector {
       lowMemoryMB: 8192,
       lowFreeMemoryMB: 2048,
       ...options.thresholds,
-    };
-    this.audioInsights =
-      options.audioInsights || ((audioPath) => this.collectAudioInsights(audioPath));
+    } as Required<NonNullable<SmartModeSelectorOptions['thresholds']>>;
+    this.audioInsights = options.audioInsights || ((audioPath) => this.collectAudioInsights(audioPath));
     this.systemInsights = options.systemInsights || (() => this.collectSystemInsights());
-    this.onDecision = typeof options.onDecision === 'function' ? options.onDecision : null;
+    this.onDecision = options.onDecision;
   }
 
-  async decide({ requestedMode, audioPath, metadata = {}, availableModes }) {
+  async decide({
+    requestedMode,
+    audioPath,
+    metadata = {},
+    availableModes,
+  }: {
+    requestedMode?: string;
+    audioPath?: string;
+    metadata?: { preferredMode?: string; audio?: AudioInsights; system?: SystemInsights };
+    availableModes?: Map<string, { key: string }>;
+  }): Promise<ModeDecision> {
     const modes = availableModes instanceof Map ? availableModes : this.modes;
     const fallbackKey = this.resolveFallbackKey(modes);
 
     if (requestedMode && requestedMode !== 'auto') {
       if (modes?.has(requestedMode)) {
-        return {
+        return this.emitDecision({
           mode: requestedMode,
           reason: 'explicit',
-          heuristics: { audio: metadata.audio || {}, system: metadata.system || {} },
-        };
+          heuristics: { audio: metadata.audio || {}, system: metadata.system || {}, overrides: {} },
+        });
       }
-      return { mode: fallbackKey, reason: 'unknown-mode', heuristics: {} };
+      return this.emitDecision({ mode: fallbackKey, reason: 'unknown-mode', heuristics: { audio: {}, system: {}, overrides: {} } });
     }
 
     const heuristics = {
       audio: { ...(metadata.audio || {}) },
       system: metadata.system || {},
-      overrides: {},
+      overrides: {} as Record<string, unknown>,
     };
 
     if (metadata.preferredMode && modes?.has(metadata.preferredMode)) {
       heuristics.overrides.preferredMode = metadata.preferredMode;
-      const decision = {
-        mode: metadata.preferredMode,
-        reason: 'preferred-mode',
-        heuristics,
-      };
-      this.emitDecision(decision);
-      return decision;
+      return this.emitDecision({ mode: metadata.preferredMode, reason: 'preferred-mode', heuristics });
     }
 
     if (!heuristics.audio.durationSeconds || heuristics.audio.durationSeconds <= 0) {
@@ -70,8 +123,8 @@ class SmartModeSelector {
     const totalMem = heuristics.system.totalMemMB || 0;
     const freeMem = heuristics.system.freeMemMB || 0;
 
-    if (heuristics.overrides?.preferredMode) {
-      resolved = heuristics.overrides.preferredMode;
+    if (heuristics.overrides.preferredMode) {
+      resolved = heuristics.overrides.preferredMode as string;
       reason = 'preferred-mode';
     } else if (duration >= this.thresholds.longDurationSeconds) {
       resolved = 'fast';
@@ -94,48 +147,45 @@ class SmartModeSelector {
     }
 
     const modeKey = modes?.has(resolved) ? resolved : fallbackKey;
-    const decision = {
-      mode: modeKey,
-      reason,
-      heuristics,
-    };
-    this.emitDecision(decision);
-    return decision;
+    return this.emitDecision({ mode: modeKey, reason, heuristics });
   }
 
-  resolveFallbackKey(modes) {
+  private resolveFallbackKey(modes?: Map<string, { key: string }>): string {
     if (modes instanceof Map && modes.size > 0) {
       if (modes.has('accurate')) {
         return 'accurate';
       }
-      return modes.keys().next().value;
+      const first = modes.keys().next();
+      if (!first.done && first.value) {
+        return first.value;
+      }
     }
     return 'accurate';
   }
 
-  async safeCollectAudio(audioPath) {
+  private async safeCollectAudio(audioPath?: string): Promise<AudioInsights> {
     if (!audioPath) {
       return {};
     }
     try {
       return await this.audioInsights(audioPath);
     } catch (error) {
-      console.warn('[SmartModeSelector] audio insight failed:', error?.message || error);
+      console.warn('[SmartModeSelector] audio insight failed:', (error as Error)?.message || error);
       return {};
     }
   }
 
-  async safeCollectSystem() {
+  private async safeCollectSystem(): Promise<SystemInsights> {
     try {
       return await this.systemInsights();
     } catch (error) {
-      console.warn('[SmartModeSelector] system insight failed:', error?.message || error);
+      console.warn('[SmartModeSelector] system insight failed:', (error as Error)?.message || error);
       return {};
     }
   }
 
-  async collectAudioInsights(audioPath) {
-    const metrics = {};
+  private async collectAudioInsights(audioPath: string): Promise<AudioInsights> {
+    const metrics: AudioInsights = {};
     if (!audioPath) {
       return metrics;
     }
@@ -144,7 +194,7 @@ class SmartModeSelector {
       const stat = await fs.promises.stat(audioPath);
       metrics.fileSizeBytes = stat.size;
     } catch (error) {
-      console.warn('[SmartModeSelector] file stat failed:', error?.message || error);
+      console.warn('[SmartModeSelector] file stat failed:', (error as Error)?.message || error);
     }
 
     try {
@@ -153,13 +203,13 @@ class SmartModeSelector {
         metrics.durationSeconds = duration;
       }
     } catch (error) {
-      console.warn('[SmartModeSelector] duration probe failed:', error?.message || error);
+      console.warn('[SmartModeSelector] duration probe failed:', (error as Error)?.message || error);
     }
 
     return metrics;
   }
 
-  collectSystemInsights() {
+  private collectSystemInsights(): SystemInsights {
     const totalMem = os.totalmem() / (1024 * 1024);
     const freeMem = os.freemem() / (1024 * 1024);
     const cpuCount = os.cpus()?.length || 1;
@@ -170,15 +220,10 @@ class SmartModeSelector {
     };
   }
 
-  emitDecision(decision) {
-    if (this.onDecision) {
-      try {
-        this.onDecision(decision);
-      } catch (error) {
-        console.warn('[SmartModeSelector] decision listener failed:', error?.message || error);
-      }
-    }
+  private emitDecision(decision: ModeDecision): ModeDecision {
+    this.onDecision?.(decision);
+    return decision;
   }
 }
 
-module.exports = { SmartModeSelector };
+export default SmartModeSelector;

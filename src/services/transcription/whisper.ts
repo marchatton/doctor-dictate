@@ -6,9 +6,9 @@ import path from 'path';
 import medicalDictionaryData from '../../data/medical-dictionary';
 import { DictationCommandProcessor } from '../../data/dictation-commands';
 import type { MedicalDictionary } from '../../types/medical';
-import { AudioProcessor } from '../audio/processor.js';
-import { WhisperCpp } from './whisper-cpp.js';
-import { TranscriptionProgress } from './progress-tracker.js';
+import AudioProcessor from '../audio/processor';
+import WhisperCpp from './whisper-cpp';
+import TranscriptionProgress from './progress-tracker';
 
 type AvailableModelInfo = {
     name: string;

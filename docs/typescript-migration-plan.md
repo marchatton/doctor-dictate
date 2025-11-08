@@ -16,13 +16,13 @@ All items below are currently **Todo** unless marked otherwise.
 - [x] Harden TypeScript coverage in `tsconfig.json`/`tsconfig.node.json`, Jest, and Vite configs.
 - [x] Add ambient declarations for preload bridges, assets, and Tailwind modules. _(New `src/types/global.d.ts` + IPC typings.)_
 - [x] Refresh ESLint/Jest settings for TypeScript-first sources; configure `ts-jest` or equivalent. _(.eslintrc now uses `@typescript-eslint`, React, hooks, a11y, import, and Jest/testing-library plugins with TypeScript resolver + overrides.)_
-- [ ] Replace remaining CommonJS `require` usage with ESM imports. _(Legacy transcription manager/engine modules still emit CommonJS and need conversion.)_
+- [x] Replace remaining CommonJS `require` usage with ESM imports. _(Transcription manager, engines, modes, processors, and audio pipeline now run as TypeScript/ESM; remaining `require()` usage is confined to legacy renderer/tests.)_
 - [x] Validate with `pnpm run lint` and `pnpm test` after updates.
 
 ## 2. Electron Entrypoints (`src/main`, `src/preload`, renderer bootstrap`) — **Status: In Progress**
 - [x] Rename core Electron files to `.ts` and type IPC handler contracts.
 - [x] Define and share a `window.electronAPI` interface between preload and renderer.
-- [ ] Convert remaining CommonJS exports to ES modules while preserving initialization order. _(Services imported by main still emit CommonJS.)_
+- [x] Convert remaining CommonJS exports to ES modules while preserving initialization order. _(Main process now consumes the typed transcription manager stack directly.)_
 - [ ] Extend Jest/e2e suites to import and mock typed Electron modules.
 
 ## 3. Renderer UI (React components & hooks) — **Status: In Progress**

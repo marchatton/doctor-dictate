@@ -6,12 +6,12 @@ import PDFDocument from 'pdfkit';
 
 import { WhisperTranscriber } from './services/transcription/whisper';
 import type { TranscriptionCorrection } from './types/medical';
-import { TranscriptionManager } from './services/transcription/manager/TranscriptionManager.js';
-import { FastMode } from './services/transcription/manager/modes/FastMode.js';
-import { AccurateMode } from './services/transcription/manager/modes/AccurateMode.js';
-import { ProgressReporter } from './services/transcription/manager/utils/ProgressReporter.js';
-import { WhisperCppEngine } from './services/transcription/manager/engines/WhisperCppEngine.js';
-import { FasterWhisperBridge } from './services/transcription/manager/engines/FasterWhisperBridge.js';
+import TranscriptionManager from './services/transcription/manager/TranscriptionManager';
+import { FastMode } from './services/transcription/manager/modes/FastMode';
+import { AccurateMode } from './services/transcription/manager/modes/AccurateMode';
+import { ProgressReporter } from './services/transcription/manager/utils/ProgressReporter';
+import { WhisperCppEngine } from './services/transcription/manager/engines/WhisperCppEngine';
+import { FasterWhisperBridge } from './services/transcription/manager/engines/FasterWhisperBridge';
 import { FormattingManager } from './services/formatting/manager/FormattingManager';
 import { ModelValidator } from './services/models/ModelValidator';
 import { ModelDownloader } from './services/models/ModelDownloader';

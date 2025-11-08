@@ -1,11 +1,48 @@
-const { AudioProcessor } = require('../../../audio/processor.js');
+import AudioProcessor from '../../../audio/processor';
 
-class AudioChunker {
-  constructor(options = {}) {
+type ChunkConfig = {
+  chunkSize?: number;
+  windowSeconds?: number;
+  overlap?: number;
+  overlapSeconds?: number;
+};
+
+type SegmentOptions = {
+  chunkConfig?: ChunkConfig;
+};
+
+type ProgressReporterLike = {
+  start: (stage: string, payload?: Record<string, unknown>) => void;
+  advance: (stage: string, payload?: Record<string, unknown>) => void;
+};
+
+type SegmentResult = {
+  processedPath: string;
+  duration: number;
+  chunks: Array<{
+    id: string | number;
+    index: number;
+    path: string;
+    start: number;
+    end: number;
+    duration: number;
+    overlap?: number;
+    isFullFile: boolean;
+  }>;
+};
+
+export class AudioChunker {
+  private readonly audioProcessor: AudioProcessor;
+
+  constructor(options: { audioProcessor?: AudioProcessor } = {}) {
     this.audioProcessor = options.audioProcessor || new AudioProcessor();
   }
 
-  async segment(audioPath, options = {}, progressReporter) {
+  async segment(
+    audioPath: string,
+    options: SegmentOptions = {},
+    progressReporter?: ProgressReporterLike,
+  ): Promise<SegmentResult> {
     if (!audioPath) {
       throw new Error('audioPath is required for segmentation');
     }
@@ -23,12 +60,9 @@ class AudioChunker {
       chunkOverlap,
     });
 
-    const processedPath = await this.audioProcessor.preprocessAudio(
-      audioPath,
-      (stage, percent, message) => {
-        progressReporter?.advance('preprocessing', { stage, percent, message });
-      }
-    );
+    const processedPath = await this.audioProcessor.preprocessAudio(audioPath, (stage, percent, message) => {
+      progressReporter?.advance('preprocessing', { stage, percent, message });
+    });
 
     progressReporter?.advance('analysis', { stage: 'duration' });
     const duration = await this.audioProcessor.getAudioDuration(processedPath);
@@ -39,13 +73,9 @@ class AudioChunker {
       chunkOverlap,
     });
 
-    const rawChunks = await this.audioProcessor.createChunks(
-      processedPath,
-      duration,
-      (stage, percent, message) => {
-        progressReporter?.advance('chunking', { stage, percent, message });
-      }
-    );
+    const rawChunks = await this.audioProcessor.createChunks(processedPath, duration, (stage, percent, message) => {
+      progressReporter?.advance('chunking', { stage, percent, message });
+    });
 
     const normalized = rawChunks.map((chunk, index) => ({
       id: chunk.id || chunk.index || `chunk-${index}`,
@@ -58,8 +88,7 @@ class AudioChunker {
       end:
         typeof chunk.end === 'number'
           ? chunk.end
-          : (typeof chunk.start === 'number' ? chunk.start : chunk.startTime || 0) +
-            (chunk.duration || chunkDuration),
+          : (typeof chunk.start === 'number' ? chunk.start : chunk.startTime || 0) + (chunk.duration || chunkDuration),
       duration: chunk.duration || chunkDuration,
       overlap: chunk.overlap ?? chunkOverlap,
       isFullFile: Boolean(chunk.isFullFile),
@@ -72,7 +101,7 @@ class AudioChunker {
     };
   }
 
-  async cleanup(segmentResult) {
+  async cleanup(segmentResult: { chunks?: Array<{ path: string; isFullFile?: boolean }> }): Promise<void> {
     if (!segmentResult || !segmentResult.chunks) {
       return;
     }
@@ -80,4 +109,4 @@ class AudioChunker {
   }
 }
 
-module.exports = { AudioChunker };
+export default AudioChunker;

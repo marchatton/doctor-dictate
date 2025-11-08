@@ -1,12 +1,25 @@
-const { FasterWhisperBridge } = require('../engines/FasterWhisperBridge');
+import { FasterWhisperBridge } from '../engines/FasterWhisperBridge';
 
-class AccurateMode {
-  constructor(options = {}) {
-    this.key = 'accurate';
-    this.label = 'Accurate (Faster Whisper)';
-    this.description =
-      'High accuracy transcription using the Python Faster Whisper bridge with VAD-driven segmentation.';
+type EngineFactory = (config: Record<string, unknown>) => unknown;
 
+type ModeOptions = {
+  config?: Record<string, unknown>;
+  engineFactory?: EngineFactory | null;
+};
+
+export class AccurateMode {
+  readonly key = 'accurate';
+
+  readonly label = 'Accurate (Faster Whisper)';
+
+  readonly description =
+    'High accuracy transcription using the Python Faster Whisper bridge with VAD-driven segmentation.';
+
+  readonly config: Record<string, unknown>;
+
+  private readonly engineFactory: EngineFactory | null;
+
+  constructor(options: ModeOptions = {}) {
     const overrides = options.config || {};
 
     this.config = {
@@ -77,21 +90,21 @@ class AccurateMode {
   }
 }
 
-function mergeConfig(base, overrides) {
+export default AccurateMode;
+
+function mergeConfig(base: Record<string, unknown>, overrides: Record<string, unknown>) {
   if (!overrides) {
     return base;
   }
 
-  const merged = { ...base };
+  const merged: Record<string, unknown> = { ...base };
   for (const key of Object.keys(overrides)) {
     const value = overrides[key];
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      merged[key] = mergeConfig(base[key] || {}, value);
+      merged[key] = mergeConfig((base[key] as Record<string, unknown>) || {}, value as Record<string, unknown>);
     } else {
       merged[key] = value;
     }
   }
   return merged;
 }
-
-module.exports = { AccurateMode };

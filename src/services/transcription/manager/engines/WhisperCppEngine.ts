@@ -1,16 +1,41 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
-class WhisperCppEngine {
-  constructor(options = {}) {
+import type { WhisperTranscriber } from '../../transcription/whisper';
+
+type WhisperBackend = (
+  chunkPath: string,
+  options: { modelPath: string; whisperOptions: Record<string, unknown> },
+) => Promise<unknown>;
+
+type WhisperCppEngineOptions = {
+  config?: Record<string, any>;
+  transcriber?: Partial<WhisperTranscriber> | null;
+  whisperFactory?: () => Promise<WhisperBackend> | WhisperBackend;
+  logger?: Pick<Console, 'info' | 'error' | 'debug' | 'warn'>;
+};
+
+export class WhisperCppEngine {
+  private config: Record<string, any> | null;
+
+  private readonly transcriber: Partial<WhisperTranscriber> | null;
+
+  private readonly whisperFactory?: () => Promise<WhisperBackend> | WhisperBackend;
+
+  private readonly logger: Pick<Console, 'info' | 'error' | 'debug' | 'warn'>;
+
+  private whisper: WhisperBackend | null;
+
+  constructor(options: WhisperCppEngineOptions = {}) {
     this.config = options.config || null;
     this.transcriber = options.transcriber || null;
-    this.whisperFactory = options.whisperFactory || null;
+    this.whisperFactory = options.whisperFactory;
     this.logger = options.logger || console;
     this.whisper = null;
   }
 
-  async initialize(config) {
+  async initialize(config?: Record<string, any>): Promise<void> {
     this.config = config || this.config;
 
     if (this.transcriber?.initializeWhisper) {
@@ -25,16 +50,10 @@ class WhisperCppEngine {
     this.whisper = await this.loadBackend();
   }
 
-  async loadBackend() {
-    if (typeof this.whisperFactory === 'function') {
-      return this.whisperFactory();
-    }
-
-    const module = await import('whisper-node');
-    return module.default || module;
-  }
-
-  async transcribeChunk(chunk, context = {}) {
+  async transcribeChunk(
+    chunk: { path: string; start?: number; startTime?: number; end?: number; duration?: number },
+    context: { config?: Record<string, any> } = {},
+  ) {
     if (!chunk || !chunk.path) {
       throw new Error('Chunk path is required for WhisperCppEngine');
     }
@@ -73,7 +92,28 @@ class WhisperCppEngine {
     };
   }
 
-  async invokeBackend(chunkPath, context) {
+  async finalize(): Promise<void> {
+    // no-op
+  }
+
+  async cleanup(): Promise<void> {
+    // no-op
+  }
+
+  private async loadBackend(): Promise<WhisperBackend> {
+    if (typeof this.whisperFactory === 'function') {
+      const backend = await this.whisperFactory();
+      return backend as WhisperBackend;
+    }
+
+    const module = await import('whisper-node');
+    return (module.default || module) as WhisperBackend;
+  }
+
+  private async invokeBackend(
+    chunkPath: string,
+    context: { chunkStart: number; chunkEnd: number; modelPath: string; whisper: Record<string, any> },
+  ) {
     if (this.transcriber?.runWhisper) {
       const text = await this.transcriber.runWhisper(chunkPath);
       return [{ start: context.chunkStart, end: context.chunkEnd, text }];
@@ -89,17 +129,9 @@ class WhisperCppEngine {
       whisperOptions,
     });
   }
-
-  async finalize() {
-    // No-op for Whisper.cpp
-  }
-
-  async cleanup() {
-    // No-op for Whisper.cpp
-  }
 }
 
-function resolveModelPath(modelPath) {
+function resolveModelPath(modelPath?: string) {
   if (!modelPath) {
     return path.resolve(process.cwd(), 'models/whisper/ggml-base.en.bin');
   }
@@ -109,8 +141,8 @@ function resolveModelPath(modelPath) {
   return path.resolve(process.cwd(), modelPath);
 }
 
-function buildWhisperOptions(settings) {
-  const cpuCount = require('os').cpus().length;
+function buildWhisperOptions(settings: Record<string, any>) {
+  const cpuCount = os.cpus().length;
   return {
     language: settings.language || 'en',
     beam_size: settings.beamSize ?? 1,
@@ -125,7 +157,10 @@ function buildWhisperOptions(settings) {
   };
 }
 
-function normalizeSegments(result, { chunkStart, chunkEnd }) {
+function normalizeSegments(
+  result: any,
+  { chunkStart, chunkEnd }: { chunkStart: number; chunkEnd: number },
+) {
   if (!result) {
     return [createFallbackSegment('', chunkStart, chunkEnd)];
   }
@@ -145,14 +180,14 @@ function normalizeSegments(result, { chunkStart, chunkEnd }) {
     return [createFallbackSegment(text, chunkStart, chunkEnd)];
   }
 
-  return segmentsArray.map((segment) => ({
+  return segmentsArray.map((segment: any) => ({
     start: segment.start ?? segment.t0 ?? chunkStart,
     end: segment.end ?? segment.t1 ?? chunkEnd,
     text: (segment.text || segment.speech || '').trim(),
   }));
 }
 
-function createFallbackSegment(text, start, end) {
+function createFallbackSegment(text: string, start: number, end: number) {
   return {
     start,
     end,
@@ -160,4 +195,4 @@ function createFallbackSegment(text, start, end) {
   };
 }
 
-module.exports = { WhisperCppEngine };
+export default WhisperCppEngine;

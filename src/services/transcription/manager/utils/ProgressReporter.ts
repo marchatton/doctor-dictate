@@ -1,18 +1,41 @@
-class ProgressReporter {
-  constructor(context = {}, options = {}) {
+import type { ModeDecision } from './SmartModeSelector';
+
+type ProgressEvent = 'stage' | 'chunk' | 'complete' | 'error' | string;
+
+type ProgressEmitter = {
+  emit: (event: ProgressEvent, payload: Record<string, unknown>) => void;
+};
+
+type Logger = Pick<Console, 'info' | 'warn' | 'error' | 'debug'>;
+
+type ReporterContext = Record<string, unknown> & { mode?: string; decision?: ModeDecision };
+
+type ProgressReporterOptions = {
+  emitter?: ProgressEmitter | null;
+  logger?: Logger;
+};
+
+export class ProgressReporter {
+  private context: ReporterContext;
+
+  private readonly emitter: ProgressEmitter | null;
+
+  private readonly logger: Logger;
+
+  constructor(context: ReporterContext = {}, options: ProgressReporterOptions = {}) {
     this.context = context;
     this.emitter = options.emitter || null;
     this.logger = options.logger || console;
   }
 
-  updateContext(partial = {}) {
+  updateContext(partial: ReporterContext = {}): void {
     if (!partial || typeof partial !== 'object') {
       return;
     }
     this.context = { ...this.context, ...partial };
   }
 
-  start(stage, payload = {}) {
+  start(stage?: string, payload: Record<string, unknown> = {}): void {
     this.emit('stage', {
       stage: stage || 'unknown',
       status: 'start',
@@ -20,30 +43,30 @@ class ProgressReporter {
     });
   }
 
-  advance(stage, payload = {}) {
+  advance(stage?: string, payload: Record<string, unknown> = {}): void {
     this.emit('stage', {
-      stage: stage || payload.stage || 'unknown',
+      stage: stage || (payload.stage as string) || 'unknown',
       status: 'progress',
       ...payload,
     });
   }
 
-  chunkProgress(payload = {}) {
+  chunkProgress(payload: Record<string, unknown> = {}): void {
     this.emit('chunk', {
       status: 'chunk',
       ...payload,
     });
   }
 
-  complete(result) {
+  complete(result: unknown): void {
     this.emit('complete', { result });
   }
 
-  fail(error) {
+  fail(error: unknown): void {
     this.emit('error', { error });
   }
 
-  emit(event, payload) {
+  private emit(event: ProgressEvent, payload: Record<string, unknown>): void {
     const enriched = { ...payload, context: this.context };
     if (this.emitter && typeof this.emitter.emit === 'function') {
       this.emitter.emit(event, enriched);
@@ -70,4 +93,4 @@ class ProgressReporter {
   }
 }
 
-module.exports = { ProgressReporter };
+export default ProgressReporter;
