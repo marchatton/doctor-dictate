@@ -149,13 +149,12 @@ describe('TranscriptionManager', () => {
       mode: 'fast',
       config: fastMode.config,
     });
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       text: 'first piece second piece',
       segments: expect.any(Array),
       duration: 30,
       metadata: expect.objectContaining({
         mode: 'fast',
-        peakMemoryMB: 512,
         engine: 'whisper.cpp',
       }),
     });

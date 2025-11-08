@@ -303,15 +303,20 @@ export class TranscriptionManager {
   }
 
   private attachMetadata(merged: any, context: { mode: string; config: any; decision: ModeDecision | null }) {
+    const metadata: Record<string, unknown> = {
+      ...merged.metadata,
+      mode: context.mode,
+      engine: merged.metadata?.engine || context.config?.whisper?.implementation,
+      peakMemoryMB: this.memoryMonitor.getPeakUsage(),
+    };
+
+    if (context.decision) {
+      metadata.modeDecision = context.decision;
+    }
+
     return {
       ...merged,
-      metadata: {
-        ...merged.metadata,
-        mode: context.mode,
-        engine: merged.metadata?.engine || context.config?.whisper?.implementation,
-        peakMemoryMB: this.memoryMonitor.getPeakUsage(),
-        modeDecision: context.decision || undefined,
-      },
+      metadata,
     };
   }
 
