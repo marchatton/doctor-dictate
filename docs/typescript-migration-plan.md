@@ -26,7 +26,7 @@ All items below are currently **Todo** unless marked otherwise.
 - [ ] Extend Jest/e2e suites to import and mock typed Electron modules.
 
 ## 3. Renderer UI (React components & hooks) — **Status: In Progress**
-- [ ] Migrate renderer components and hooks to `.tsx` with typed props, state, and contexts. _(Primary screens/hooks live in `.tsx`/`.ts`; `components/ui/{button,card,waveform}.js` remain outstanding.)_
+- [x] Migrate renderer components and hooks to `.tsx` with typed props, state, and contexts. _(Legacy DOM helpers under `src/components/ui` and `src/renderer.ts` have been removed; the active React/Vite renderer is fully typed.)_
 - [ ] Centralize shared UI types (variants, contexts) to avoid duplication.
 - [ ] Update Storybook/docs references as needed while keeping Tailwind classes intact.
 - [ ] Port React Testing Library specs to TypeScript.
