@@ -2,7 +2,7 @@
 
 This document consolidates the outstanding work for migrating the DoctorDictate codebase from JavaScript to TypeScript.
 
-> **Current status (April 2025):** The migration is already underway. The renderer, hooks, and most shared UI utilities are written in TypeScript, and the toolchain (Vite, Jest with `ts-jest`, and the project `tsconfig` presets) compiles `.ts`/`.tsx` sources today. The remaining work focuses on converting the CommonJS Electron entrypoints, service layer, prompt/data modules, and Jest mocks that still rely on JavaScript-only patterns.
+> **Current status (November 2025):** Renderer, hooks, shared UI utilities, prompts/data, and the audio/transcription/formatting services now run in TypeScript. The dual-mode processing pipeline (processing-config + UnifiedProcessor) was converted in November with new Jest coverage. Remaining work is concentrated on Electron/E2E harnesses, renderer Storybook/docs alignment, TypeScript mocks, and build scripts that still assume `.js` entrypoints.
 
 ## Status Legend
 - **Todo** – not yet started
@@ -36,6 +36,7 @@ All items below are currently **Todo** unless marked otherwise.
 - [x] Type Whisper/Ollama interactions with explicit interfaces and generics. _(Whisper transcriber already typed; Ollama formatter + structured response parser now in `src/services/formatting/*.ts`.)_
 - [x] Migrate model asset services (`ModelDownloader`, `ModelValidator`) and tests to `.ts`.
 - [x] Run integration suites (`pnpm test`) to confirm behavior.
+- [x] Convert dual-mode processing config + `UnifiedProcessor` orchestration to `.ts` with Jest coverage for the Whisper fallback + Ollama formatting flow.
 
 ## 5. Prompts & Data Modules — **Status: Done**
 - [x] Decide on typed JSON exports vs. TypeScript modules for prompt/data assets. _(Prompt index, detector, manifest builder, and static builder now ship as `.ts` and load typed templates.)_
@@ -51,6 +52,12 @@ All items below are currently **Todo** unless marked otherwise.
 - [ ] Review helper scripts that touch `src` modules and update paths/compilation steps.
 - [ ] Confirm Vite/Electron builder entrypoints target compiled TypeScript outputs.
 - [ ] Document developer workflow updates in `CLAUDE.md` or related guides once finalized.
+
+## Remaining Focus Areas (snapshot)
+- **Electron suites**: Extend Jest/e2e harnesses to import the typed `main`/`preload` modules and exercise new IPC typings (Section 2).
+- **Renderer docs/testing**: Centralize UI/variant types, refresh Storybook/docs links, and finish porting RTL specs to TypeScript (Section 3).
+- **Test doubles**: Convert `src/__mocks__` (and any remaining `require`-style mocks) or supply `.d.ts` shims so ts-jest stops falling back to `any` (Section 6).
+- **Automation**: Update helper scripts + builder entrypoints to point at compiled `.ts` outputs and document the workflow in `CLAUDE.md` once validated (Section 7).
 
 ## Tracking & Next Steps
 - Use this checklist to open focused PRs per section.

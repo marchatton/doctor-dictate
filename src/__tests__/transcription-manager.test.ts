@@ -1,26 +1,95 @@
 import path from 'path';
 
-describe('TranscriptionManager', () => {
-  let TranscriptionManager;
-  let FastMode;
-  let mockMemoryMonitor;
-  let mockProgressReporterFactory;
-  let progressInstances;
-  let mockChunker;
-  let mockVadProcessor;
-  let mockResultMerger;
-  let mockModeSelector;
-  let engine;
+type TranscriptionManagerCtor = typeof import('../services/transcription/manager/TranscriptionManager').TranscriptionManager;
+type FastModeCtor = typeof import('../services/transcription/manager/modes/FastMode').FastMode;
 
-  beforeEach(() => {
+type ChunkDescriptor = {
+  id: string;
+  path: string;
+  start: number;
+  end: number;
+  duration: number;
+};
+
+type ChunkResult = {
+  text: string;
+  segments: Array<{ start: number; end: number; text: string }>;
+  start: number;
+  end: number;
+};
+
+type ProgressReporterMock = {
+  start: jest.Mock<void, [string | undefined, Record<string, unknown>?]>;
+  advance: jest.Mock<void, [string | undefined, Record<string, unknown>?]>;
+  chunkProgress: jest.Mock<void, [Record<string, unknown>?]>;
+  complete: jest.Mock<void, [unknown?]>;
+  fail: jest.Mock<void, [unknown?]>;
+  updateContext?: jest.Mock<void, [Record<string, unknown>]>;
+};
+
+type MemoryMonitorMock = {
+  startMonitoring: jest.Mock<void, [number | undefined]>;
+  stopMonitoring: jest.Mock<void, []>;
+  getPeakUsage: jest.Mock<number, []>;
+  isNearLimit: jest.Mock<boolean, []>;
+  requestTrim: jest.Mock<void, []>;
+};
+
+type ChunkerMock = {
+  segment: jest.Mock<
+    Promise<{ processedPath: string; chunks: ChunkDescriptor[]; duration: number }>,
+    [string, Record<string, unknown>, ProgressReporterMock]
+  >;
+  cleanup: jest.Mock<Promise<void>, []>;
+};
+
+type VadProcessorMock = {
+  apply: jest.Mock<Promise<ChunkDescriptor[]>, [ChunkDescriptor[], Record<string, unknown>, ProgressReporterMock]>;
+};
+
+type ResultMergerMock = {
+  merge: jest.Mock<
+    {
+      text: string;
+      segments: Array<{ start: number; end: number; text: string }>;
+      duration: number;
+    },
+    [Record<string, unknown>]
+  >;
+};
+
+type ModeSelectorMock = {
+  decide: jest.Mock;
+};
+
+type EngineMock = {
+  initialize: jest.Mock<Promise<void>, [Record<string, unknown>?]>;
+  transcribeChunk: jest.Mock<Promise<ChunkResult>, [ChunkDescriptor, Record<string, unknown>]>;
+  finalize: jest.Mock<Promise<void>, [ChunkResult[], Record<string, unknown>]>;
+  cleanup: jest.Mock<Promise<void>, []>;
+};
+
+describe('TranscriptionManager', () => {
+  let TranscriptionManager: TranscriptionManagerCtor;
+  let FastMode: FastModeCtor;
+  let mockMemoryMonitor: MemoryMonitorMock;
+  let mockProgressReporterFactory: jest.Mock<ProgressReporterMock, [Record<string, unknown>]>;
+  let progressInstances: ProgressReporterMock[];
+  let mockChunker: ChunkerMock;
+  let mockVadProcessor: VadProcessorMock;
+  let mockResultMerger: ResultMergerMock;
+  let mockModeSelector: ModeSelectorMock;
+  let engine: EngineMock;
+
+  beforeEach(async () => {
     jest.resetModules();
     progressInstances = [];
 
     mockMemoryMonitor = {
-      startMonitoring: jest.fn(),
+      startMonitoring: jest.fn<void, [number | undefined]>(),
       stopMonitoring: jest.fn(),
-      getPeakUsage: jest.fn(() => 512),
-      isNearLimit: jest.fn(() => false),
+      getPeakUsage: jest.fn<number, []>(() => 512),
+      isNearLimit: jest.fn<boolean, []>(() => false),
       requestTrim: jest.fn(),
     };
 
@@ -28,14 +97,16 @@ describe('TranscriptionManager', () => {
       MemoryMonitor: jest.fn(() => mockMemoryMonitor),
     }));
 
-    mockProgressReporterFactory = jest.fn(() => {
-      const reporter = {
+    mockProgressReporterFactory = jest.fn<ProgressReporterMock, [Record<string, unknown>]>((context) => {
+      const reporter: ProgressReporterMock = {
         start: jest.fn(),
         advance: jest.fn(),
         chunkProgress: jest.fn(),
         complete: jest.fn(),
         fail: jest.fn(),
+        updateContext: jest.fn(),
       };
+      reporter.updateContext?.(context);
       progressInstances.push(reporter);
       return reporter;
     });
@@ -52,25 +123,38 @@ describe('TranscriptionManager', () => {
       SmartModeSelector: jest.fn(() => mockModeSelector),
     }));
 
-    ({ TranscriptionManager } = require('../services/transcription/manager/TranscriptionManager'));
-    ({ FastMode } = require('../services/transcription/manager/modes/FastMode'));
+    TranscriptionManager = (await import('../services/transcription/manager/TranscriptionManager')).TranscriptionManager;
+    FastMode = (await import('../services/transcription/manager/modes/FastMode')).FastMode;
 
     mockChunker = {
-      segment: jest.fn(),
-      cleanup: jest.fn(),
+      segment: jest.fn<
+        Promise<{ processedPath: string; chunks: ChunkDescriptor[]; duration: number }>,
+        [string, Record<string, unknown>, ProgressReporterMock]
+      >(),
+      cleanup: jest.fn<Promise<void>, []>().mockResolvedValue(undefined),
     };
     mockVadProcessor = {
-      apply: jest.fn(),
+      apply: jest.fn<Promise<ChunkDescriptor[]>, [ChunkDescriptor[], Record<string, unknown>, ProgressReporterMock]>(),
     };
     mockResultMerger = {
-      merge: jest.fn(),
+      merge: jest.fn<
+        {
+          text: string;
+          segments: Array<{ start: number; end: number; text: string }>;
+          duration: number;
+        },
+        [Record<string, unknown>]
+      >(),
     };
 
     engine = {
-      initialize: jest.fn().mockResolvedValue(undefined),
-      transcribeChunk: jest.fn(),
-      finalize: jest.fn().mockResolvedValue(undefined),
-      cleanup: jest.fn().mockResolvedValue(undefined),
+      initialize: jest.fn<Promise<void>, [Record<string, unknown>?]>().mockResolvedValue(undefined),
+      transcribeChunk: jest.fn<
+        Promise<ChunkResult>,
+        [ChunkDescriptor, Record<string, unknown>]
+      >(),
+      finalize: jest.fn<Promise<void>, [ChunkResult[], Record<string, unknown>]>().mockResolvedValue(undefined),
+      cleanup: jest.fn<Promise<void>, []>().mockResolvedValue(undefined),
     };
   });
 
