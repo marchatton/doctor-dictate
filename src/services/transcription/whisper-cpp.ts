@@ -1,4 +1,5 @@
 import { spawn } from 'child_process';
+import type { SpawnOptionsWithoutStdio } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -39,6 +40,14 @@ export class WhisperCpp {
     this.modelsPath = path.join(os.homedir(), '.whisper-cpp', 'models');
   }
 
+  async isAvailable(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const check = spawn('which', ['whisper-cli']);
+      check.on('close', (code) => resolve(code === 0));
+      check.on('error', () => resolve(false));
+    });
+  }
+
   async ensureModel(): Promise<string> {
     const modelFile = path.join(this.modelsPath, `ggml-${this.model}.bin`);
     if (!fs.existsSync(modelFile)) {
@@ -76,7 +85,7 @@ export class WhisperCpp {
     return { wavPath, isTemp: true };
   }
 
-  async transcribe(audioPath: string, options: Record<string, unknown> = {}): Promise<string> {
+  async transcribe(audioPath: string, options: SpawnOptionsWithoutStdio = {}): Promise<string> {
     const modelPath = await this.ensureModel();
     const { wavPath, isTemp } = await this.convertToWav(audioPath);
 
@@ -125,9 +134,9 @@ export class WhisperCpp {
     return 'whisper-cli';
   }
 
-  private runProcess(args: string[]): Promise<string> {
+  private runProcess(args: string[], options: SpawnOptionsWithoutStdio = {}): Promise<string> {
     return new Promise((resolve, reject) => {
-      const whisper = spawn(this.whisperPath, args);
+      const whisper = spawn(this.whisperPath, args, options);
 
       let output = '';
       let errorOutput = '';
