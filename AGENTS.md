@@ -11,6 +11,10 @@
 - **KISS**: prefer straightforward pipelines; revisit complexity after correctness.
 - **YAGNI**: implement only what the current workflow requires.
 - **DRY**: keep medical rules, prompts, and templates in their single sources of truth (`src/data`, `src/prompts`, `src/templates`).
+- **Define shared contracts first**: add/extend shared TS interfaces/enums under `src/types/**` before touching consumers so every PR reuses the same shapes.
+- **Convert source + colocated tests together**: when a module migrates to TS, migrate its `__tests__` sibling too (or add `.d.ts` shims) so ts-jest never falls back to `any`.
+- **Scripts are first-class**: decide if each script runs via ts-node or compiled outputs, document that choice (e.g., `CLAUDE.md`), and keep helper scripts aligned with the build pipeline.
+- **Verify after each chunk**: run `pnpm run lint` + `pnpm test` after every sizeable change (renderer/services/mocks/docs) so regressions surface immediately.
 
 ---
 
