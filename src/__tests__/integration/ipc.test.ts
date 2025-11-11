@@ -4,6 +4,13 @@
  */
 
 import '@testing-library/jest-dom';
+import type { ElectronAPI } from '../../types/ipc';
+
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI;
+  }
+}
 
 describe('IPC Integration Tests', () => {
   // Mock the full electron API as it would appear in the renderer
@@ -28,9 +35,9 @@ describe('IPC Integration Tests', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Set up window.electronAPI using direct assignment
-    (global.window as any).electronAPI = mockElectronAPI;
+    window.electronAPI = mockElectronAPI as unknown as ElectronAPI;
   });
 
   describe('Audio Processing Pipeline', () => {

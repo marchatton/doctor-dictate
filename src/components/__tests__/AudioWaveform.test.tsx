@@ -2,20 +2,56 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { AudioWaveform } from '../AudioWaveform';
 
-beforeAll(() => {
-  const globalAny = global as any;
-  if (!globalAny.window) {
-    globalAny.window = globalAny;
+type MockAnalyser = {
+  fftSize: number;
+  frequencyBinCount: number;
+  smoothingTimeConstant: number;
+  getByteTimeDomainData: jest.Mock<void, [Uint8Array]>;
+};
+
+type MockAudioContext = {
+  createAnalyser: jest.Mock<MockAnalyser>;
+  createMediaStreamSource: jest.Mock<{ connect: jest.Mock }>;
+  close: jest.Mock<Promise<void>, []>;
+  state: AudioContextState;
+};
+
+type GlobalTestContext = typeof globalThis & {
+  AudioContext: jest.Mock<MockAudioContext>;
+  window: (Window & typeof globalThis) & {
+    AudioContext: jest.Mock<MockAudioContext>;
+    webkitAudioContext?: typeof AudioContext;
+  };
+};
+
+type MockMediaStream = Pick<MediaStream, 'getTracks' | 'getAudioTracks'> & { id?: string };
+
+const ensureTestGlobals = (): GlobalTestContext => {
+  const globalWithWindow = globalThis as typeof globalThis & { window?: Window & typeof globalThis };
+  if (!globalWithWindow.window) {
+    globalWithWindow.window = globalWithWindow as Window & typeof globalThis;
   }
-  globalAny.AudioContext = jest.fn();
-  globalAny.window.AudioContext = globalAny.AudioContext;
-  globalAny.window.webkitAudioContext = undefined;
+  const typed = globalWithWindow as GlobalTestContext;
+  if (!typed.AudioContext) {
+    const audioContextMock = jest.fn<MockAudioContext, []>();
+    typed.AudioContext = audioContextMock;
+    typed.window.AudioContext = audioContextMock;
+    typed.window.webkitAudioContext = undefined;
+  }
+  return typed;
+};
+
+const asMediaStream = (stream: MockMediaStream | null): MediaStream | null =>
+  (stream ? (stream as unknown as MediaStream) : null);
+
+beforeAll(() => {
+  ensureTestGlobals();
 });
 
 describe('AudioWaveform Component', () => {
-  let mockAudioContext: any;
-  let mockAnalyser: any;
-  let mockStream: MediaStream;
+  let mockAudioContext: MockAudioContext;
+  let mockAnalyser: MockAnalyser;
+  let mockStream: MockMediaStream;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -28,7 +64,7 @@ describe('AudioWaveform Component', () => {
         for (let i = 0; i < array.length; i++) {
           array[i] = 128 + Math.floor(Math.sin(i) * 20);
         }
-      })
+      }),
     };
 
     mockAudioContext = {
@@ -37,10 +73,10 @@ describe('AudioWaveform Component', () => {
         connect: jest.fn()
       })),
       close: jest.fn().mockResolvedValue(undefined),
-      state: 'running'
+      state: 'running',
     };
 
-    const audioContextMock = (global as any).AudioContext as jest.Mock;
+    const audioContextMock = ensureTestGlobals().AudioContext;
     audioContextMock.mockClear();
     audioContextMock.mockImplementation(() => mockAudioContext);
 
@@ -59,8 +95,8 @@ describe('AudioWaveform Component', () => {
         enabled: true,
         muted: false,
         readyState: 'live'
-      }]
-    } as any;
+      }],
+    } as MockMediaStream;
   });
 
   describe('Basic Rendering', () => {
@@ -71,16 +107,16 @@ describe('AudioWaveform Component', () => {
 
     it('should not create audio context when inactive', () => {
       render(<AudioWaveform isActive={false} />);
-      expect((global as any).AudioContext).not.toHaveBeenCalled();
+      expect(ensureTestGlobals().AudioContext).not.toHaveBeenCalled();
     });
 
     it('should create audio context when active with stream', () => {
-      render(<AudioWaveform isActive={true} audioStream={mockStream} />);
-      expect((global as any).AudioContext).toHaveBeenCalled();
+      render(<AudioWaveform isActive={true} audioStream={asMediaStream(mockStream)} />);
+      expect(ensureTestGlobals().AudioContext).toHaveBeenCalled();
     });
 
     it('should render waveform bars when active', async () => {
-      const { container } = render(<AudioWaveform isActive={true} audioStream={mockStream} />);
+      const { container } = render(<AudioWaveform isActive={true} audioStream={asMediaStream(mockStream)} />);
       
       await waitFor(() => {
         const bars = container.querySelectorAll('[style*="height"]');
@@ -91,14 +127,14 @@ describe('AudioWaveform Component', () => {
 
   describe('Audio Processing', () => {
     it('should connect audio source to analyser', () => {
-      render(<AudioWaveform isActive={true} audioStream={mockStream} />);
+      render(<AudioWaveform isActive={true} audioStream={asMediaStream(mockStream)} />);
       
       expect(mockAudioContext.createMediaStreamSource).toHaveBeenCalledWith(mockStream);
       expect(mockAudioContext.createAnalyser).toHaveBeenCalled();
     });
 
     it('should set correct analyser properties', () => {
-      render(<AudioWaveform isActive={true} audioStream={mockStream} />);
+      render(<AudioWaveform isActive={true} audioStream={asMediaStream(mockStream)} />);
       
       expect(mockAnalyser.fftSize).toBe(256);
       expect(mockAnalyser.smoothingTimeConstant).toBeCloseTo(0.3);
@@ -107,14 +143,14 @@ describe('AudioWaveform Component', () => {
 
   describe('Cleanup', () => {
     it('should close audio context on unmount', () => {
-      const { unmount } = render(<AudioWaveform isActive={true} audioStream={mockStream} />);
+      const { unmount } = render(<AudioWaveform isActive={true} audioStream={asMediaStream(mockStream)} />);
       unmount();
       expect(mockAudioContext.close).toHaveBeenCalled();
     });
 
     it('should close audio context when becoming inactive', () => {
-      const { rerender } = render(<AudioWaveform isActive={true} audioStream={mockStream} />);
-      rerender(<AudioWaveform isActive={false} audioStream={mockStream} />);
+      const { rerender } = render(<AudioWaveform isActive={true} audioStream={asMediaStream(mockStream)} />);
+      rerender(<AudioWaveform isActive={false} audioStream={asMediaStream(mockStream)} />);
       expect(mockAudioContext.close).toHaveBeenCalled();
     });
   });
@@ -136,9 +172,9 @@ describe('AudioWaveform Component', () => {
     });
 
     it('should not create multiple audio contexts for same stream', () => {
-      const { rerender } = render(<AudioWaveform isActive={true} audioStream={mockStream} />);
-      rerender(<AudioWaveform isActive={true} audioStream={mockStream} />);
-      expect((global as any).AudioContext).toHaveBeenCalledTimes(1);
+      const { rerender } = render(<AudioWaveform isActive={true} audioStream={asMediaStream(mockStream)} />);
+      rerender(<AudioWaveform isActive={true} audioStream={asMediaStream(mockStream)} />);
+      expect(ensureTestGlobals().AudioContext).toHaveBeenCalledTimes(1);
     });
   });
 });

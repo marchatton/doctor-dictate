@@ -597,7 +597,7 @@ class WhisperTranscriber {
                     resolve(false);
                 });
             });
-        } catch (error) {
+        } catch {
             return false;
         }
     }
@@ -662,7 +662,7 @@ class WhisperTranscriber {
             for (let i = 3; i < progressFiles.length; i++) {
                 fs.unlinkSync(progressFiles[i].path);
             }
-        } catch (error) {
+        } catch {
             // Silent cleanup failure - not critical
         }
     }

@@ -1,5 +1,3 @@
-const path = require('path');
-
 describe('FormattingManager', () => {
   let FormattingManager;
   let promptManager;

@@ -22,9 +22,9 @@ module.exports = {
     }]
   },
   moduleNameMapper: {
-    '\\.(css|less|scss|sass)$': '<rootDir>/src/__mocks__/styleMock.js',
-    '\\.(jpg|jpeg|png|gif|webp|svg)$': '<rootDir>/src/__mocks__/fileMock.js',
-    '^electron$': '<rootDir>/src/__mocks__/electron.js'
+    '\\.(css|less|scss|sass)$': '<rootDir>/src/__mocks__/styleMock.ts',
+    '\\.(jpg|jpeg|png|gif|webp|svg)$': '<rootDir>/src/__mocks__/fileMock.ts',
+    '^electron$': '<rootDir>/src/__mocks__/electron.ts'
   },
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   collectCoverageFrom: [

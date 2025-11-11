@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { EditIcon, SaveIcon, FileTextIcon, PlusIcon, CheckIcon, ClipboardIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Modal } from './Modal';
-import { filterTemplate, extractMedications, countMedicalTerms, extractMedicalTerms, extractPatientName } from '../utils/templateFilter';
+import { extractMedications, countMedicalTerms, extractMedicalTerms, extractPatientName } from '../utils/templateFilter';
 
 declare global {
   interface Window {

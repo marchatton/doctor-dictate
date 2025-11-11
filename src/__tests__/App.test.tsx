@@ -1,11 +1,36 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import App from '../App';
+
+type RecordingScreenMockProps = {
+  onStartRecording: () => void;
+  onStopRecording: () => void;
+  onTranscriptionComplete: (transcript: string) => void;
+  onProcessingStart: () => void;
+  onProcessingProgress: (stage: string, percent: number) => void;
+  onModeResolved: (mode: string, decision: { reason: string }) => void;
+};
+
+type ProcessingScreenMockProps = {
+  processingStep: string;
+  processingProgress: number;
+};
+
+type TranscriptScreenMockProps = {
+  transcript: string;
+  onNewRecording: () => void;
+};
 
 // Mock the components to focus on App logic
 jest.mock('../components/RecordingScreen', () => ({
-  RecordingScreen: ({ onStartRecording, onStopRecording, onTranscriptionComplete, onProcessingStart, onProcessingProgress, onModeResolved }: any) => (
+  RecordingScreen: ({
+    onStartRecording,
+    onStopRecording,
+    onTranscriptionComplete,
+    onProcessingStart,
+    onProcessingProgress,
+    onModeResolved,
+  }: RecordingScreenMockProps) => (
     <div data-testid="recording-screen">
       <button onClick={onStartRecording}>Start Recording</button>
       <button onClick={onStopRecording}>Stop Recording</button>
@@ -23,7 +48,7 @@ jest.mock('../components/RecordingScreen', () => ({
 }));
 
 jest.mock('../components/ProcessingScreen', () => ({
-  ProcessingScreen: ({ processingStep, processingProgress }: any) => (
+  ProcessingScreen: ({ processingStep, processingProgress }: ProcessingScreenMockProps) => (
     <div data-testid="processing-screen">
       Processing: {processingStep} - {processingProgress}%
     </div>
@@ -31,7 +56,7 @@ jest.mock('../components/ProcessingScreen', () => ({
 }));
 
 jest.mock('../components/TranscriptScreen', () => ({
-  TranscriptScreen: ({ transcript, onNewRecording }: any) => (
+  TranscriptScreen: ({ transcript, onNewRecording }: TranscriptScreenMockProps) => (
     <div data-testid="transcript-screen">
       Transcript: {transcript}
       <button onClick={onNewRecording}>New Recording</button>

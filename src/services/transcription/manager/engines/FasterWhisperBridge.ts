@@ -5,11 +5,64 @@ import FormData from 'form-data';
 
 import type { WhisperTranscriber } from '../../transcription/whisper';
 
-type BridgeConfig = Record<string, any>;
+type WhisperSettings = {
+  device?: string;
+  computeType?: string;
+  [key: string]: unknown;
+};
+
+type BridgeOverrides = {
+  pythonPath?: string;
+  port?: number;
+  host?: string;
+};
+
+type BridgeConfig = {
+  whisper?: {
+    model?: string;
+    modelPath?: string;
+    settings?: WhisperSettings;
+  };
+  bridge?: BridgeOverrides;
+  [key: string]: unknown;
+};
+
+type ChunkPayload = {
+  path: string;
+  start?: number;
+  end?: number;
+  duration?: number;
+  [key: string]: unknown;
+};
+
+type TranscriptionResponse = {
+  text: string;
+  segments: Array<{
+    start: number;
+    end: number;
+    text: string;
+    index?: number;
+  }>;
+  start: number;
+  end: number;
+  metadata: Record<string, unknown>;
+};
+
+type BridgeSegment = {
+  start?: number;
+  end?: number;
+  text?: string;
+};
+
+type BridgeResponse = {
+  text?: string;
+  segments?: BridgeSegment[];
+  [key: string]: unknown;
+};
 
 type HttpClientLike = {
   ensureReady: (config: BridgeConfig | null, port: number) => Promise<void>;
-  transcribeChunk: (chunk: any, config: BridgeConfig | null, port: number) => Promise<any>;
+  transcribeChunk: (chunk: ChunkPayload, config: BridgeConfig | null, port: number) => Promise<TranscriptionResponse>;
 };
 
 type FetchLike = typeof fetch;
@@ -75,7 +128,7 @@ export class FasterWhisperBridge {
     await this.waitForBridge();
   }
 
-  async transcribeChunk(chunk: any): Promise<any> {
+  async transcribeChunk(chunk: ChunkPayload): Promise<TranscriptionResponse> {
     if (!chunk || !chunk.path) {
       throw new Error('Chunk path is required for FasterWhisperBridge');
     }
@@ -105,7 +158,7 @@ export class FasterWhisperBridge {
     }
 
     const response = await this.invokeBridge(chunk.path, this.config);
-    const segments = (response.segments || []).map((segment: any, index: number) => ({
+    const segments = (response.segments || []).map((segment: BridgeSegment, index: number) => ({
       start: segment.start ?? chunk.start ?? 0,
       end: segment.end ?? chunk.end ?? (chunk.start ?? 0) + (chunk.duration || 0),
       text: segment.text || '',
@@ -259,15 +312,16 @@ export class FasterWhisperBridge {
     return this.fetchImpl;
   }
 
-  private async invokeBridge(chunkPath: string, config: BridgeConfig | null) {
+  private async invokeBridge(chunkPath: string, config: BridgeConfig | null): Promise<BridgeResponse> {
     const fetchImpl = await this.resolveFetch();
     const formData = new FormData();
-    formData.append('file', fs.createReadStream(chunkPath) as any);
+    formData.append('file', fs.createReadStream(chunkPath));
     formData.append('config', JSON.stringify(config));
 
+    const requestBody = formData as unknown as BodyInit;
     const response = await fetchImpl(new URL('/transcribe', `http://${this.host}:${this.port}`), {
       method: 'POST',
-      body: formData as any,
+      body: requestBody,
     });
 
     if (!response.ok) {
@@ -275,7 +329,7 @@ export class FasterWhisperBridge {
       throw new Error(`Bridge request failed: ${response.status} ${body}`);
     }
 
-    return response.json();
+    return (await response.json()) as BridgeResponse;
   }
 
   resolveModelPath(modelPath?: string): string | null {

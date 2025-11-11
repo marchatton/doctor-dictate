@@ -40,7 +40,7 @@ describe('Audio Utilities', () => {
   });
 
   describe('Audio Blob Validation', () => {
-    const isValidAudioBlob = (blob: Blob): boolean => {
+    const isValidAudioBlob = (blob: Blob | null | undefined): boolean => {
       return blob instanceof Blob && 
              blob.size > 0 && 
              blob.type.startsWith('audio/');
@@ -62,8 +62,8 @@ describe('Audio Utilities', () => {
     });
 
     it('should reject null or undefined', () => {
-      expect(isValidAudioBlob(null as any)).toBe(false);
-      expect(isValidAudioBlob(undefined as any)).toBe(false);
+      expect(isValidAudioBlob(null)).toBe(false);
+      expect(isValidAudioBlob(undefined)).toBe(false);
     });
   });
 
@@ -111,26 +111,28 @@ describe('Audio Utilities', () => {
     });
 
     it('should handle missing MediaRecorder', () => {
-      const originalMediaRecorder = global.MediaRecorder;
-      delete (global as any).MediaRecorder;
+      const globalScope = globalThis as typeof globalThis & { MediaRecorder?: typeof MediaRecorder };
+      const originalMediaRecorder = globalScope.MediaRecorder;
+      delete globalScope.MediaRecorder;
 
       expect(isMediaRecorderSupported()).toBe(false);
 
-      global.MediaRecorder = originalMediaRecorder;
+      globalScope.MediaRecorder = originalMediaRecorder;
     });
 
     it('should handle missing navigator', () => {
-      const originalNavigator = global.navigator;
-      delete (global as any).navigator;
+      const globalScope = globalThis as typeof globalThis & { navigator?: Navigator };
+      const originalNavigator = globalScope.navigator;
+      delete globalScope.navigator;
 
       expect(isMediaRecorderSupported()).toBe(false);
 
-      global.navigator = originalNavigator;
+      globalScope.navigator = originalNavigator;
     });
   });
 
   describe('Audio Processing Errors', () => {
-    const processAudioData = (audioData: ArrayBuffer): { success: boolean; error?: string } => {
+    const processAudioData = (audioData: ArrayBuffer | null | undefined): { success: boolean; error?: string } => {
       try {
         if (!audioData) {
           throw new Error('No audio data provided');
@@ -154,7 +156,7 @@ describe('Audio Utilities', () => {
     };
 
     it('should handle null audio data', () => {
-      const result = processAudioData(null as any);
+      const result = processAudioData(null);
       expect(result.success).toBe(false);
       expect(result.error).toBe('No audio data provided');
     });
@@ -207,14 +209,17 @@ describe('Audio Utilities', () => {
     });
 
     it('should handle missing isTypeSupported method', () => {
-      const original = MediaRecorder.isTypeSupported;
-      delete (MediaRecorder as any).isTypeSupported;
+      const recorderType = MediaRecorder as typeof MediaRecorder & {
+        isTypeSupported?: typeof MediaRecorder.isTypeSupported;
+      };
+      const original = recorderType.isTypeSupported!;
+      delete recorderType.isTypeSupported;
 
       const supported = getSupportedMimeTypes();
       
       expect(supported).toEqual([]);
 
-      MediaRecorder.isTypeSupported = original;
+      recorderType.isTypeSupported = original;
     });
   });
 
@@ -238,7 +243,7 @@ describe('Audio Utilities', () => {
 
       const mockStream = {
         getTracks: () => [mockTrack]
-      } as any;
+      } as unknown as MediaStream;
 
       cleanupAudioStream(mockStream);
 
@@ -254,7 +259,7 @@ describe('Audio Utilities', () => {
 
       const mockStream = {
         getTracks: () => [mockTrack]
-      } as any;
+      } as unknown as MediaStream;
 
       cleanupAudioStream(mockStream);
 

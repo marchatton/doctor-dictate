@@ -318,7 +318,7 @@ describe('Electron Main Process', () => {
       // Test with handler that might throw
       try {
         await ipcHandlers['get-app-version']();
-      } catch (error) {
+      } catch {
         // Should not throw - errors should be caught and logged
       }
 

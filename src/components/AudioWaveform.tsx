@@ -5,6 +5,11 @@ import { MicIcon } from 'lucide-react';
 let instanceCounter = 0;
 let loopCounter = 0;
 
+type ExtendedWindow = Window &
+  typeof globalThis & {
+    webkitAudioContext?: typeof AudioContext;
+  };
+
 interface AudioWaveformProps {
   isActive: boolean;
   audioStream?: MediaStream | null;
@@ -23,8 +28,10 @@ export function AudioWaveform({
   const loopIdRef = useRef<number>(0);
 
   useEffect(() => {
+    const instanceId = instanceIdRef.current;
+    const label = `[Waveform-${instanceId}]`;
     const effectId = Math.random().toString(36).substr(2, 9);
-    console.log(`[Waveform-${instanceIdRef.current}] Effect START (${effectId})`, { 
+    console.log(`${label} Effect START (${effectId})`, { 
       isActive, 
       hasAudioStream: !!audioStream,
       streamId: audioStream?.id,
@@ -33,7 +40,7 @@ export function AudioWaveform({
     
     // Clean up any previous animation frame first
     if (animationFrameRef.current) {
-      console.log(`[Waveform-${instanceIdRef.current}] Cancelling previous animation frame (${animationFrameRef.current})`);
+      console.log(`${label} Cancelling previous animation frame (${animationFrameRef.current})`);
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = undefined;
     }
@@ -41,15 +48,15 @@ export function AudioWaveform({
     // Stop previous animation loop
     const wasRunning = isRunningRef.current;
     isRunningRef.current = false;
-    console.log(`[Waveform-${instanceIdRef.current}] Setting isRunning to false (was: ${wasRunning})`);
+    console.log(`${label} Setting isRunning to false (was: ${wasRunning})`);
     
     if (isActive && audioStream) {
-      console.log(`[Waveform-${instanceIdRef.current}] Starting audio analysis setup`);
+      console.log(`${label} Starting audio analysis setup`);
       
       try {
         // Verify audio stream has active tracks
         const audioTracks = audioStream.getAudioTracks();
-        console.log(`[Waveform-${instanceIdRef.current}] Audio tracks analysis:`, {
+        console.log(`${label} Audio tracks analysis:`, {
           trackCount: audioTracks.length,
           tracks: audioTracks.map((t, i) => ({ 
             index: i,
@@ -63,24 +70,32 @@ export function AudioWaveform({
         });
         
         if (audioTracks.length === 0 || !audioTracks.some(t => t.enabled && t.readyState === 'live')) {
-          console.error(`[Waveform-${instanceIdRef.current}] No active audio tracks in stream`);
+          console.error(`${label} No active audio tracks in stream`);
           setBars([15, 20, 25, 20, 15]); // Keep default flat bars
           return;
         }
         
         // Clean up existing audio context if it exists
         if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-          console.log(`[Waveform-${instanceIdRef.current}] Closing existing audio context (state: ${audioContextRef.current.state})`);
+          console.log(`${label} Closing existing audio context (state: ${audioContextRef.current.state})`);
           audioContextRef.current.close();
         }
         
         // Create audio context and analyser
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const extendedWindow = window as ExtendedWindow;
+        const AudioContextConstructor = extendedWindow.AudioContext || extendedWindow.webkitAudioContext;
+        if (!AudioContextConstructor) {
+          console.warn(`${label} AudioContext is not available in this environment`);
+          return () => {
+            console.log(`${label} Effect END (${effectId})`);
+          };
+        }
+        const audioContext = new AudioContextConstructor();
         audioContextRef.current = audioContext;
-        console.log(`[Waveform-${instanceIdRef.current}] Created AudioContext`, {
+        console.log(`${label} Created AudioContext`, {
           state: audioContext.state,
           sampleRate: audioContext.sampleRate,
-          baseLatency: (audioContext as any).baseLatency
+          baseLatency: audioContext.baseLatency
         });
         
         // Create analyser and source
@@ -90,7 +105,7 @@ export function AudioWaveform({
         analyser.fftSize = 256; // Higher resolution for time domain
         analyser.smoothingTimeConstant = 0.3; // Much less smoothing for responsiveness
         
-        console.log(`[Waveform-${instanceIdRef.current}] Connecting audio pipeline`, {
+        console.log(`${label} Connecting audio pipeline`, {
           analyserCreated: !!analyser,
           sourceCreated: !!source,
           fftSize: analyser.fftSize,
@@ -102,18 +117,18 @@ export function AudioWaveform({
         analyserRef.current = analyser;
         sourceRef.current = source;
         
-        console.log(`[Waveform-${instanceIdRef.current}] Audio pipeline connected`);
+        console.log(`${label} Audio pipeline connected`);
         
         // Resume context if it's suspended (required for some browsers)
         if (audioContext.state === 'suspended') {
-          console.log(`[Waveform-${instanceIdRef.current}] AudioContext is suspended, attempting to resume...`);
+          console.log(`${label} AudioContext is suspended, attempting to resume...`);
           audioContext.resume().then(() => {
-            console.log(`[Waveform-${instanceIdRef.current}] AudioContext resumed successfully, new state: ${audioContext.state}`);
+            console.log(`${label} AudioContext resumed successfully, new state: ${audioContext.state}`);
           }).catch(err => {
-            console.error(`[Waveform-${instanceIdRef.current}] Failed to resume AudioContext:`, err);
+            console.error(`${label} Failed to resume AudioContext:`, err);
           });
         } else {
-          console.log(`[Waveform-${instanceIdRef.current}] AudioContext state is already: ${audioContext.state}`);
+          console.log(`${label} AudioContext state is already: ${audioContext.state}`);
         }
         
         const bufferLength = analyser.fftSize;
@@ -129,31 +144,31 @@ export function AudioWaveform({
         loopIdRef.current = currentLoopId;
         
         isRunningRef.current = true; // Set flag to start animation
-        console.log(`[Waveform-${instanceIdRef.current}] Starting animation loop #${currentLoopId}`);
+        console.log(`${label} Starting animation loop #${currentLoopId}`);
         
         const updateBars = () => {
           frameCount++;
           
           // Check if we should continue running
           if (!isRunningRef.current) {
-            console.log(`[Waveform-${instanceIdRef.current}] Loop #${currentLoopId} stopped (isRunning false) at frame ${frameCount}`);
+            console.log(`${label} Loop #${currentLoopId} stopped (isRunning false) at frame ${frameCount}`);
             return;
           }
           
           // Check if this is still the current loop
           if (currentLoopId !== loopIdRef.current) {
-            console.log(`[Waveform-${instanceIdRef.current}] Loop #${currentLoopId} stopped (newer loop #${loopIdRef.current} exists)`);
+            console.log(`${label} Loop #${currentLoopId} stopped (newer loop #${loopIdRef.current} exists)`);
             return;
           }
           
           // Check audio context state periodically and try to resume if suspended
           if (frameCount % 120 === 0 && audioContextRef.current) {
             if (audioContextRef.current.state === 'suspended') {
-              console.warn(`[Waveform-${instanceIdRef.current}] Loop #${currentLoopId} AudioContext is suspended at frame ${frameCount}, attempting to resume...`);
+              console.warn(`${label} Loop #${currentLoopId} AudioContext is suspended at frame ${frameCount}, attempting to resume...`);
               audioContextRef.current.resume().then(() => {
-                console.log(`[Waveform-${instanceIdRef.current}] Loop #${currentLoopId} AudioContext resumed after suspension`);
+                console.log(`${label} Loop #${currentLoopId} AudioContext resumed after suspension`);
               }).catch(err => {
-                console.error(`[Waveform-${instanceIdRef.current}] Loop #${currentLoopId} Failed to resume suspended AudioContext:`, err);
+                console.error(`${label} Loop #${currentLoopId} Failed to resume suspended AudioContext:`, err);
               });
             }
           }
@@ -171,11 +186,11 @@ export function AudioWaveform({
               if (allSame && firstFewSamples[0] === 128) {
                 noDataCounter++;
                 if (noDataCounter % 60 === 0) {
-                  console.warn(`[Waveform-${instanceIdRef.current}] Loop #${currentLoopId} No audio data (silence) for ${noDataCounter} frames`);
+                  console.warn(`${label} Loop #${currentLoopId} No audio data (silence) for ${noDataCounter} frames`);
                 }
               } else {
                 if (noDataCounter > 0) {
-                  console.log(`[Waveform-${instanceIdRef.current}] Loop #${currentLoopId} Audio data resumed after ${noDataCounter} frames of silence`);
+                  console.log(`${label} Loop #${currentLoopId} Audio data resumed after ${noDataCounter} frames of silence`);
                   noDataCounter = 0;
                 }
               }
@@ -213,7 +228,7 @@ export function AudioWaveform({
               
               // Log periodically for debugging (every 60 frames = ~1 second)
               if (frameCount % 60 === 0) {
-                console.log(`[Waveform-${instanceIdRef.current}] Loop #${currentLoopId} Frame ${frameCount} update:`, { 
+                console.log(`${label} Loop #${currentLoopId} Frame ${frameCount} update:`, { 
                   rms: rms.toFixed(4), 
                   volumeLevel: volumeLevel.toFixed(1), 
                   gatedLevel: gatedLevel.toFixed(1),
@@ -243,12 +258,12 @@ export function AudioWaveform({
               
               setBars(newBars);
             } catch (error) {
-              console.error(`[Waveform-${instanceIdRef.current}] Loop #${currentLoopId} Error updating waveform:`, error);
+              console.error(`${label} Loop #${currentLoopId} Error updating waveform:`, error);
               isRunningRef.current = false;
             }
           } else {
             if (frameCount % 60 === 0) {
-              console.warn(`[Waveform-${instanceIdRef.current}] Loop #${currentLoopId} Frame ${frameCount} - Analyser not available or context not running:`, {
+              console.warn(`${label} Loop #${currentLoopId} Frame ${frameCount} - Analyser not available or context not running:`, {
                 hasAnalyser: !!analyserRef.current,
                 hasAudioContext: !!audioContextRef.current,
                 contextState: audioContextRef.current?.state,
@@ -277,17 +292,17 @@ export function AudioWaveform({
         
         // Cleanup function to stop the loop
         return () => {
-          console.log(`[Waveform-${instanceIdRef.current}] Effect cleanup for loop #${currentLoopId} (effectId: ${effectId})`);
+          console.log(`${label} Effect cleanup for loop #${currentLoopId} (effectId: ${effectId})`);
           isRunningRef.current = false; // Stop the animation loop
           
           if (animationFrameRef.current) {
-            console.log(`[Waveform-${instanceIdRef.current}] Cancelling animation frame in cleanup`);
+            console.log(`${label} Cancelling animation frame in cleanup`);
             cancelAnimationFrame(animationFrameRef.current);
             animationFrameRef.current = undefined;
           }
           
           if (sourceRef.current) {
-            console.log(`[Waveform-${instanceIdRef.current}] Disconnecting source in cleanup`);
+            console.log(`${label} Disconnecting source in cleanup`);
             if (typeof sourceRef.current.disconnect === 'function') {
               sourceRef.current.disconnect();
             }
@@ -295,24 +310,24 @@ export function AudioWaveform({
           }
           
           if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-            console.log(`[Waveform-${instanceIdRef.current}] Closing audio context in cleanup (state: ${audioContextRef.current.state})`);
+            console.log(`${label} Closing audio context in cleanup (state: ${audioContextRef.current.state})`);
             audioContextRef.current.close().catch(err => {
-              console.error(`[Waveform-${instanceIdRef.current}] Error closing audio context:`, err);
+              console.error(`${label} Error closing audio context:`, err);
             });
           }
         };
       } catch (error) {
-        console.error(`[Waveform-${instanceIdRef.current}] Error initializing audio analysis:`, error);
+        console.error(`${label} Error initializing audio analysis:`, error);
         setBars([15, 20, 25, 20, 15]); // Reset to default on error
       }
     } else {
       // Not recording - reset to default bars
-      console.log(`[Waveform-${instanceIdRef.current}] Not recording, cleaning up (effectId: ${effectId})`);
+      console.log(`${label} Not recording, cleaning up (effectId: ${effectId})`);
       setBars([15, 20, 25, 20, 15]); // Reset to lower default bars
       
       // Clean up audio resources
       if (sourceRef.current) {
-        console.log(`[Waveform-${instanceIdRef.current}] Disconnecting source (not recording)`);
+        console.log(`${label} Disconnecting source (not recording)`);
         if (typeof sourceRef.current.disconnect === 'function') {
           sourceRef.current.disconnect();
         }
@@ -320,16 +335,16 @@ export function AudioWaveform({
       }
       
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        console.log(`[Waveform-${instanceIdRef.current}] Closing audio context (not recording, state: ${audioContextRef.current.state})`);
+        console.log(`${label} Closing audio context (not recording, state: ${audioContextRef.current.state})`);
         audioContextRef.current.close().catch(err => {
-          console.error(`[Waveform-${instanceIdRef.current}] Error closing audio context:`, err);
+          console.error(`${label} Error closing audio context:`, err);
         });
       }
     }
     
     // Return cleanup for effect END logging
     return () => {
-      console.log(`[Waveform-${instanceIdRef.current}] Effect END (${effectId})`);
+      console.log(`${label} Effect END (${effectId})`);
     };
   }, [isActive, audioStream]);
   if (!isActive) {

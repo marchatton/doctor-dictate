@@ -7,16 +7,59 @@ import { MemoryMonitor } from './utils/MemoryMonitor';
 import { ProgressReporter } from './utils/ProgressReporter';
 import { SmartModeSelector, ModeDecision } from './utils/SmartModeSelector';
 
+type ModeConfig = {
+  performance?: { maxMemoryMB?: number };
+  chunking?: Record<string, unknown>;
+  vad?: (Record<string, unknown> & { enabled?: boolean }) | undefined;
+  whisper?: { implementation?: string; [key: string]: unknown };
+  formatting?: { mode?: string } & Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+type ChunkDescriptor = {
+  id?: string | number;
+  path: string;
+  start?: number;
+  end?: number;
+  duration?: number;
+  [key: string]: unknown;
+};
+
+type ChunkTranscription = {
+  text?: string;
+  segments?: Array<Record<string, unknown>>;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+type ModeEngine = {
+  initialize?: (config?: ModeConfig) => Promise<void>;
+  finalize?: (chunks: ChunkTranscription[], context: Record<string, unknown>) => Promise<void>;
+  cleanup?: () => Promise<void>;
+  transcribeChunk: (chunk: ChunkDescriptor, context: { config: ModeConfig }) => Promise<ChunkTranscription>;
+};
+
+type SegmentResult = {
+  chunks: ChunkDescriptor[];
+  duration: number;
+};
+
+type MergeResult = {
+  text: string;
+  duration?: number;
+  metadata?: Record<string, unknown>;
+  formatted?: string;
+  corrected?: string;
+  raw?: string;
+  segments?: Array<Record<string, unknown>>;
+};
+
 type TranscriptionMode = {
   key: string;
   label: string;
   description?: string;
-  config: any;
-  createEngine: () => {
-    initialize?: (config?: Record<string, unknown>) => Promise<void>;
-    finalize?: (chunks: unknown[], context: Record<string, unknown>) => Promise<void>;
-    cleanup?: () => Promise<void>;
-  } & Record<string, any>;
+  config: ModeConfig;
+  createEngine: () => ModeEngine;
 };
 
 type ProcessorOverrides = {
@@ -146,10 +189,8 @@ export class TranscriptionManager {
     this.memoryMonitor.startMonitoring(config.performance?.maxMemoryMB);
     progressReporter.start('initializing', { audioPath, mode: selectedMode.key });
 
-    let segmentResult: { chunks: any[]; duration: number } | null = null;
-    const chunkResults: any[] = [];
-    const startedAt = Date.now();
-
+    let segmentResult: SegmentResult | null = null;
+    const chunkResults: ChunkTranscription[] = [];
     try {
       progressReporter.start('mode-selection', {
         chosenMode: selectedMode.key,
@@ -184,12 +225,12 @@ export class TranscriptionManager {
         await engine.finalize(chunkResults, { config });
       }
 
-      let merged = await this.resultMerger.merge({
+      let merged = (await this.resultMerger.merge({
         chunks: chunkResults,
         duration: segmentResult.duration,
         mode: selectedMode.key,
         config,
-      });
+      })) as MergeResult;
 
       if (this.formattingManager && merged.text) {
         progressReporter.advance('formatting', {
@@ -285,13 +326,13 @@ export class TranscriptionManager {
     signal,
     progressReporter,
   }: {
-    chunks: any[];
-    engine: any;
-    config: any;
+    chunks: ChunkDescriptor[];
+    engine: ModeEngine;
+    config: ModeConfig;
     signal?: AbortSignal;
     progressReporter: ProgressReporter;
-  }) {
-    const results = [];
+  }): Promise<ChunkTranscription[]> {
+    const results: ChunkTranscription[] = [];
     for (let index = 0; index < chunks.length; index += 1) {
       this.throwIfAborted(signal);
       const chunk = chunks[index];
@@ -302,7 +343,7 @@ export class TranscriptionManager {
     return results;
   }
 
-  private attachMetadata(merged: any, context: { mode: string; config: any; decision: ModeDecision | null }) {
+  private attachMetadata(merged: MergeResult, context: { mode: string; config: ModeConfig; decision: ModeDecision | null }) {
     const metadata: Record<string, unknown> = {
       ...merged.metadata,
       mode: context.mode,

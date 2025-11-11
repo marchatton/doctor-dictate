@@ -81,7 +81,8 @@ export function parseStructuredResponse(
   try {
     parsed = JSON.parse(jsonText);
   } catch (error) {
-    throw new Error('Failed to parse JSON response');
+    const reason = error instanceof Error ? error.message : 'unknown error';
+    throw new Error(`Failed to parse JSON response: ${reason}`);
   }
 
   if (!parsed.sections) {

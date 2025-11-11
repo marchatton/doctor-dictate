@@ -4,20 +4,62 @@ import path from 'path';
 
 import type { WhisperTranscriber } from '../../transcription/whisper';
 
+type WhisperSettings = {
+  language?: string;
+  beamSize?: number;
+  temperature?: number;
+  threads?: number;
+  maxContext?: number;
+  maxLen?: number;
+  splitOnWord?: boolean;
+  noFallback?: boolean;
+  suppressBlank?: boolean;
+  suppressNonSpeechTokens?: boolean;
+  [key: string]: unknown;
+};
+
+type WhisperConfig = {
+  whisper?: {
+    model?: string;
+    modelPath?: string;
+    settings?: WhisperSettings;
+  };
+  [key: string]: unknown;
+};
+
+type BackendSegment = {
+  start?: number;
+  end?: number;
+  t0?: number;
+  t1?: number;
+  text?: string;
+  speech?: string;
+};
+
+type WhisperBackendResult = string | BackendSegment[] | { segments?: BackendSegment[]; text?: string };
+
 type WhisperBackend = (
   chunkPath: string,
   options: { modelPath: string; whisperOptions: Record<string, unknown> },
-) => Promise<unknown>;
+) => Promise<WhisperBackendResult>;
+
+type ChunkInput = {
+  path: string;
+  start?: number;
+  startTime?: number;
+  end?: number;
+  duration?: number;
+};
 
 type WhisperCppEngineOptions = {
-  config?: Record<string, any>;
+  config?: WhisperConfig | null;
   transcriber?: Partial<WhisperTranscriber> | null;
   whisperFactory?: () => Promise<WhisperBackend> | WhisperBackend;
   logger?: Pick<Console, 'info' | 'error' | 'debug' | 'warn'>;
 };
 
 export class WhisperCppEngine {
-  private config: Record<string, any> | null;
+  private config: WhisperConfig | null;
 
   private readonly transcriber: Partial<WhisperTranscriber> | null;
 
@@ -35,7 +77,7 @@ export class WhisperCppEngine {
     this.whisper = null;
   }
 
-  async initialize(config?: Record<string, any>): Promise<void> {
+  async initialize(config?: WhisperConfig): Promise<void> {
     this.config = config || this.config;
 
     if (this.transcriber?.initializeWhisper) {
@@ -51,8 +93,8 @@ export class WhisperCppEngine {
   }
 
   async transcribeChunk(
-    chunk: { path: string; start?: number; startTime?: number; end?: number; duration?: number },
-    context: { config?: Record<string, any> } = {},
+    chunk: ChunkInput,
+    context: { config?: WhisperConfig } = {},
   ) {
     if (!chunk || !chunk.path) {
       throw new Error('Chunk path is required for WhisperCppEngine');
@@ -112,7 +154,7 @@ export class WhisperCppEngine {
 
   private async invokeBackend(
     chunkPath: string,
-    context: { chunkStart: number; chunkEnd: number; modelPath: string; whisper: Record<string, any> },
+    context: { chunkStart: number; chunkEnd: number; modelPath: string; whisper: Record<string, unknown> },
   ) {
     if (this.transcriber?.runWhisper) {
       const text = await this.transcriber.runWhisper(chunkPath);
@@ -123,7 +165,7 @@ export class WhisperCppEngine {
       this.whisper = await this.loadBackend();
     }
 
-    const whisperOptions = buildWhisperOptions(context.whisper?.settings || {});
+    const whisperOptions = buildWhisperOptions((context.whisper?.settings as WhisperSettings) || {});
     return this.whisper(chunkPath, {
       modelPath: context.modelPath,
       whisperOptions,
@@ -141,7 +183,7 @@ function resolveModelPath(modelPath?: string) {
   return path.resolve(process.cwd(), modelPath);
 }
 
-function buildWhisperOptions(settings: Record<string, any>) {
+function buildWhisperOptions(settings: WhisperSettings) {
   const cpuCount = os.cpus().length;
   return {
     language: settings.language || 'en',
@@ -158,7 +200,7 @@ function buildWhisperOptions(settings: Record<string, any>) {
 }
 
 function normalizeSegments(
-  result: any,
+  result: WhisperBackendResult | null | undefined,
   { chunkStart, chunkEnd }: { chunkStart: number; chunkEnd: number },
 ) {
   if (!result) {
@@ -169,10 +211,10 @@ function normalizeSegments(
     return [createFallbackSegment(result, chunkStart, chunkEnd)];
   }
 
-  const segmentsArray = Array.isArray(result)
+  const segmentsArray: BackendSegment[] = Array.isArray(result)
     ? result
-    : Array.isArray(result.segments)
-    ? result.segments
+    : Array.isArray(result?.segments)
+    ? result?.segments ?? []
     : [];
 
   if (segmentsArray.length === 0) {
@@ -180,7 +222,7 @@ function normalizeSegments(
     return [createFallbackSegment(text, chunkStart, chunkEnd)];
   }
 
-  return segmentsArray.map((segment: any) => ({
+  return segmentsArray.map((segment: BackendSegment) => ({
     start: segment.start ?? segment.t0 ?? chunkStart,
     end: segment.end ?? segment.t1 ?? chunkEnd,
     text: (segment.text || segment.speech || '').trim(),

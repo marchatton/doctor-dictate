@@ -1,13 +1,12 @@
-// Mock Electron APIs for testing
-module.exports = {
+const mockElectron = {
   app: {
     getVersion: jest.fn(() => '1.0.0'),
     getName: jest.fn(() => 'DoctorDictate'),
-    getPath: jest.fn((path) => `/mock/${path}`),
+    getPath: jest.fn((path: string) => `/mock/${path}`),
     quit: jest.fn(),
     isPackaged: false,
     whenReady: jest.fn(() => Promise.resolve()),
-    on: jest.fn()
+    on: jest.fn(),
   },
   BrowserWindow: jest.fn().mockImplementation(() => ({
     loadURL: jest.fn(),
@@ -20,28 +19,30 @@ module.exports = {
       setWindowOpenHandler: jest.fn(),
       session: {
         webRequest: {
-          onHeadersReceived: jest.fn()
-        }
+          onHeadersReceived: jest.fn(),
+        },
       },
       on: jest.fn(),
-      send: jest.fn()
-    }
+      send: jest.fn(),
+    },
   })),
   ipcMain: {
     handle: jest.fn(),
-    on: jest.fn()
+    on: jest.fn(),
   },
   ipcRenderer: {
     invoke: jest.fn(),
     on: jest.fn(),
     removeAllListeners: jest.fn(),
-    send: jest.fn()
+    send: jest.fn(),
   },
   dialog: {
     showSaveDialog: jest.fn(() => Promise.resolve({ canceled: false, filePath: '/mock/file.txt' })),
-    showOpenDialog: jest.fn(() => Promise.resolve({ canceled: false, filePaths: ['/mock/file.txt'] }))
+    showOpenDialog: jest.fn(() => Promise.resolve({ canceled: false, filePaths: ['/mock/file.txt'] })),
   },
   contextBridge: {
-    exposeInMainWorld: jest.fn()
-  }
+    exposeInMainWorld: jest.fn(),
+  },
 };
+
+export = mockElectron;

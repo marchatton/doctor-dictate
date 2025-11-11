@@ -318,7 +318,8 @@ class TemplateLoader {
       const template = require(`../templates/format/${templateName}.json`);
       return template;
     } catch (error) {
-      throw new Error(`Template '${templateName}' not found`);
+      const reason = error instanceof Error ? error.message : 'unknown error';
+      throw new Error(`Template '${templateName}' not found: ${reason}`);
     }
   }
   
@@ -328,7 +329,7 @@ class TemplateLoader {
       const path = require('path');
       const examplePath = path.join(__dirname, '..', 'templates', 'example', `${templateName}.md`);
       return fs.readFileSync(examplePath, 'utf8');
-    } catch (error) {
+    } catch {
       return null;
     }
   }

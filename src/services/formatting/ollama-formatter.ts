@@ -81,8 +81,10 @@ export class OllamaFormatter {
       console.log('✅ Static prompt loaded successfully from .txt');
       return prompt;
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       console.warn('⚠️ Static prompt not found, will use dynamic generation');
       console.warn('  Run "pnpm run build-prompt" to generate static prompt');
+      console.warn('  Details:', message);
       return null;
     }
   }

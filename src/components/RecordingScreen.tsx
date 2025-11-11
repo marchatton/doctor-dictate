@@ -1,30 +1,29 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { MicIcon, StopCircleIcon, CheckCircleIcon } from 'lucide-react';
 import { AudioWaveform } from './AudioWaveform';
 import { TranscriptionModeSelector } from './ui/TranscriptionModeSelector';
+import type { ElectronAPI, TranscriptionModeInfo, TranscriptionProgressUpdate } from '../types/ipc';
 
 declare global {
   interface Window {
-    electronAPI: {
-      saveAudioBlob: (audioBuffer: ArrayBuffer) => Promise<{success: boolean, filePath?: string, error?: string}>;
-      transcribeAudio: (
-        request: string | { audioPath: string; mode?: string }
-      ) => Promise<{success: boolean, transcript?: string, formatted?: string, metadata?: Record<string, unknown>, error?: string}>;
-      setWhisperModel: (model: string) => Promise<{success: boolean}>;
-      onTranscriptionProgress: (callback: (progress: any) => void) => void;
-      removeTranscriptionProgressListener: () => void;
-    };
+    electronAPI?: ElectronAPI;
   }
 }
 
+type RecordingTranscriptPayload =
+  | string
+  | {
+      transcript?: string;
+      formatted?: string;
+      raw?: string;
+      corrections?: Array<Record<string, unknown>>;
+      medications?: string[];
+      metadata?: Record<string, unknown>;
+      [key: string]: unknown;
+    };
+
 interface RecordingScreenProps {
-  availableModes: Array<{
-    key: string;
-    label: string;
-    description?: string;
-    details?: string[];
-    config?: Record<string, unknown>;
-  }>;
+  availableModes: TranscriptionModeInfo[];
   selectedMode: string;
   onSelectMode: (key: string) => void;
   isRecording: boolean;
@@ -32,7 +31,7 @@ interface RecordingScreenProps {
   setRecordingTime: (value: number) => void;
   onStartRecording: () => void;
   onStopRecording: () => void;
-  onTranscriptionComplete: (transcript: any) => void;
+  onTranscriptionComplete: (transcript: RecordingTranscriptPayload) => void;
   onProcessingStart: () => void;
   onProcessingProgress: (step: string, progress: number) => void;
   onModeResolved: (mode: string, decision?: Record<string, unknown>) => void;
@@ -57,6 +56,8 @@ export function RecordingScreen({
   const audioChunksRef = useRef<Blob[]>([]);
   const mimeTypeRef = useRef<string>('audio/webm');
   const currentMode = availableModes.find((mode) => mode.key === selectedMode);
+  const selectedModeRef = useRef(selectedMode);
+  const setRecordingTimeRef = useRef(setRecordingTime);
   
   // Store callbacks in refs to prevent re-initialization
   const onTranscriptionCompleteRef = useRef(onTranscriptionComplete);
@@ -70,7 +71,15 @@ export function RecordingScreen({
     onProcessingProgressRef.current = onProcessingProgress;
     onProcessingStartRef.current = onProcessingStart;
     onModeResolvedRef.current = onModeResolved;
-  });
+  }, [onTranscriptionComplete, onProcessingProgress, onProcessingStart, onModeResolved]);
+
+  useEffect(() => {
+    selectedModeRef.current = selectedMode;
+  }, [selectedMode]);
+
+  useEffect(() => {
+    setRecordingTimeRef.current = setRecordingTime;
+  }, [setRecordingTime]);
   // Initialize media recorder - only once on component mount
   useEffect(() => {
     let mounted = true;
@@ -163,7 +172,7 @@ export function RecordingScreen({
           onProcessingStartRef.current(); // Signal that processing has started
           
           // Set up progress listener to map backend progress to UI steps
-          window.electronAPI?.onTranscriptionProgress((progress) => {
+          window.electronAPI?.onTranscriptionProgress((progress: TranscriptionProgressUpdate) => {
             console.log('Transcription progress:', progress);
             if (progress.mode) {
               onModeResolvedRef.current?.(progress.mode, progress.decision);
@@ -239,7 +248,7 @@ export function RecordingScreen({
             
             const transcribeResult = await window.electronAPI.transcribeAudio({
               audioPath: saveResult.filePath,
-              mode: selectedMode,
+              mode: selectedModeRef.current,
             });
             console.log('Transcribe result:', transcribeResult);
             
@@ -261,7 +270,7 @@ export function RecordingScreen({
               alert(errorMessage);
               // Reset the recording state
               setIsRecording(false);
-              setRecordingTime(0);
+              setRecordingTimeRef.current(0);
             }
           } catch (error) {
             console.error('Error processing audio:', error);
@@ -271,7 +280,7 @@ export function RecordingScreen({
             alert(`Processing Error: ${errorMessage}`);
             // Reset the recording state
             setIsRecording(false);
-            setRecordingTime(0);
+            setRecordingTimeRef.current(0);
           } finally {
             // Clean up progress listener
             window.electronAPI?.removeTranscriptionProgressListener();
@@ -308,12 +317,12 @@ export function RecordingScreen({
         });
       }
     };
-  }, []); // Empty dependency array - only run once on mount
+  }, [mediaRecorder]); // Re-check recorder when state changes (initializes only once)
 
   // Set Whisper model based on selected mode
   useEffect(() => {
-    const modeConfig = (currentMode?.config as Record<string, any>) || {};
-    const model = modeConfig?.whisper?.model || (selectedMode === 'fast' ? 'base.en' : 'small.en');
+    const config = currentMode?.config as { whisper?: { model?: string } } | undefined;
+    const model = config?.whisper?.model || (selectedMode === 'fast' ? 'base.en' : 'small.en');
     window.electronAPI?.setWhisperModel(model);
   }, [selectedMode, currentMode]);
 

@@ -1,5 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircleIcon, CircleIcon, Clock3Icon } from 'lucide-react';
+
+const PROCESSING_STEPS = [
+  {
+    id: 'audio',
+    label: 'Preparing audio',
+    weight: 15,
+  },
+  {
+    id: 'transcribe',
+    label: 'Transcribing speech',
+    weight: 65,
+    longStep: true,
+  },
+  {
+    id: 'medical',
+    label: 'Medical formatting',
+    weight: 15,
+  },
+  {
+    id: 'complete',
+    label: 'Finalizing',
+    weight: 5,
+  },
+] as const;
 interface ModeDecision {
   mode?: string;
   reason?: string;
@@ -36,24 +60,6 @@ export function ProcessingScreen({
   const [currentStep, setCurrentStep] = useState(0);
   const [progressPercentage, setProgressPercentage] = useState(0);
   const processingTime = modeKey === 'fast' ? 1 : 3;
-  const PROCESSING_STEPS = [{
-    id: 'audio',
-    label: 'Preparing audio',
-    weight: 15
-  }, {
-    id: 'transcribe',
-    label: 'Transcribing speech',
-    weight: 65,
-    longStep: true
-  }, {
-    id: 'medical',
-    label: 'Medical formatting',
-    weight: 15
-  }, {
-    id: 'complete',
-    label: 'Finalizing',
-    weight: 5
-  }];
   useEffect(() => {
     // Find current step index based on processingStep prop
     const stepIndex = PROCESSING_STEPS.findIndex(step => step.id === processingStep);
@@ -84,6 +90,9 @@ export function ProcessingScreen({
   const decisionNote = modeDecision?.reason ? decisionReasonMap[modeDecision.reason] || `Smart mode applied: ${modeDecision.reason}` : null;
   const minutes = modeDecision?.heuristics?.audio?.durationSeconds
     ? Math.round((modeDecision.heuristics.audio.durationSeconds / 60) * 10) / 10
+    : null;
+  const processedMinutesDisplay = minutesProcessed > 0 || totalMinutes > 0
+    ? `Processed ~${minutesProcessed.toFixed(1)} min${totalMinutes > 0 ? ` of ~${Math.max(totalMinutes, minutesProcessed).toFixed(1)} min total` : ''}`
     : null;
 
   return <div className="bg-white rounded-xl shadow-xl p-8 max-w-2xl mx-auto">
@@ -129,8 +138,13 @@ export function ProcessingScreen({
             </div>;
       })}
       </div>
-      <p className="text-center text-stone-600 bg-stone-50 py-3 px-4 rounded-lg border border-stone-100">
-        {currentStep < PROCESSING_STEPS.length - 1 ? `Estimated time remaining: ~${processingTime - Math.round(progressPercentage / 100 * processingTime)} minute${processingTime - Math.round(progressPercentage / 100 * processingTime) !== 1 ? 's' : ''}` : 'All processing complete! Preparing transcript...'}
-      </p>
-    </div>;
-}
+	      <p className="text-center text-stone-600 bg-stone-50 py-3 px-4 rounded-lg border border-stone-100">
+	        {currentStep < PROCESSING_STEPS.length - 1 ? `Estimated time remaining: ~${processingTime - Math.round(progressPercentage / 100 * processingTime)} minute${processingTime - Math.round(progressPercentage / 100 * processingTime) !== 1 ? 's' : ''}` : 'All processing complete! Preparing transcript...'}
+	      </p>
+	      {processedMinutesDisplay ? (
+	        <p className="text-center text-xs text-stone-500 mt-2">
+	          {processedMinutesDisplay}
+	        </p>
+	      ) : null}
+	    </div>;
+  }
