@@ -60,6 +60,22 @@ All items below are currently **Todo** unless marked otherwise.
 - **Test doubles**: Convert the remaining JS-based suites (formatting/transcription/prompts tests, legacy dual-mode harness) or supply `.d.ts` shims so ts-jest keeps full typing coverage (Section 6).
 - **Automation**: Update helper scripts + builder entrypoints to point at compiled `.ts` outputs and document the workflow in `CLAUDE.md` once validated (Section 7).
 
+## Completion Checklist (blocking items)
+1. **Electron coverage**
+   - [ ] Convert `src/__tests__/main.test.js` to `.ts` and import the typed IPC contracts.
+   - [ ] Modernize `src/__tests__/e2e-workflow.test.js` + `test/test-dual-mode.js` so they spin up the TS build artifacts (or add `.d.ts` shims if they must stay JS).
+2. **Renderer consolidation**
+   - [ ] Extract shared variant/intent enums into `src/types/ui.ts` and refactor `RecordingScreen`, `TranscriptionModeSelector`, `ProcessingScreen`, etc. to consume them.
+   - [ ] Refresh README + `docs/renderer.md` snippets to reflect strict TS usage (no `any`, no deprecated props).
+   - [ ] Port the straggling RTL suites (`src/components/__tests__/AudioWaveform.test.tsx` is done; remaining JS specs listed via `rg --files src/components/__tests__ -g '*.test.js*'`) to `.test.tsx`.
+3. **Test doubles + fixtures**
+   - [ ] Convert formatting/transcription/prompt suites under `src/services/**/__tests__/*.test.js` and `src/prompts/__tests__/*.test.js` to TypeScript, or add module shims so ts-jest stops falling back to `any`.
+   - [ ] Ensure fixtures/mocks live under `src/__mocks__` or typed helper modules (no inline `any` assertions).
+4. **Automation + scripts**
+   - [ ] Update every script in `scripts/test-runners/` and `scripts/setup-*.js` to consume compiled outputs (or run via ts-node with explicit configs).
+   - [ ] Document the TS-first workflow in `CLAUDE.md` (how to run scripts, regenerate prompts, run lint/tests/build).
+   - [ ] Verify `pnpm run build` + `electron-builder` operate solely on compiled artifacts (`dist-react`, `dist-electron`).
+
 ## Tracking & Next Steps
 - Use this checklist to open focused PRs per section.
 - Keep regression tests green (`pnpm run lint`, `pnpm test`, `pnpm run build` for risky refactors).
