@@ -1,36 +1,64 @@
+import { FormattingManager } from '../FormattingManager';
+
+type PromptManagerMock = {
+  buildPrompt: jest.Mock<string, [string]>;
+  getModeConfig: jest.Mock<
+    {
+      maxSegmentLength: number;
+      overlapSentences: number;
+      model: string;
+      timeout: number;
+      options: Record<string, unknown>;
+      profile?: Record<string, unknown>;
+    },
+    [string?]
+  >;
+  postProcess: jest.Mock<string, [string]>;
+};
+
+type OllamaClientMock = {
+  generate: jest.Mock<
+    Promise<{ text: string; model: string; options: Record<string, unknown>; timeout: number }>,
+    [{ prompt: string; model: string; options: Record<string, unknown>; timeout: number }]
+  >;
+  ensureHealthy: jest.Mock<Promise<void>, []>;
+  ensureModel: jest.Mock<Promise<void>, [string]>;
+};
+
+type CacheMock = {
+  get: jest.Mock<unknown, [string]>;
+  set: jest.Mock<void, [string, unknown]>;
+  touch: jest.Mock<void, [string]>;
+  buildKey: jest.Mock<string, [string, string]>;
+};
+
 describe('FormattingManager', () => {
-  let FormattingManager;
-  let promptManager;
-  let ollamaClient;
-  let cache;
+  let promptManager: PromptManagerMock;
+  let ollamaClient: OllamaClientMock;
+  let cache: CacheMock;
 
   beforeEach(() => {
-    jest.resetModules();
-    ({ FormattingManager } = require('../FormattingManager'));
-
     promptManager = {
       buildPrompt: jest.fn((text) => `PROMPT:${text}`),
       getModeConfig: jest.fn(() => ({
         maxSegmentLength: 50,
         overlapSentences: 0,
         model: 'tinyllama',
-        timeout: 30000,
+        timeout: 30_000,
         options: { temperature: 0.2 },
       })),
       postProcess: jest.fn((text) => text.trim()),
     };
 
     ollamaClient = {
-      generate: jest.fn(async ({ prompt, model, options, timeout }) => {
-        return {
-          text: prompt.replace('PROMPT:', '').trim().toUpperCase(),
-          model,
-          options,
-          timeout,
-        };
-      }),
-      ensureHealthy: jest.fn(() => Promise.resolve()),
-      ensureModel: jest.fn(() => Promise.resolve()),
+      generate: jest.fn(async ({ prompt, model, options, timeout }) => ({
+        text: prompt.replace('PROMPT:', '').trim().toUpperCase(),
+        model,
+        options,
+        timeout,
+      })),
+      ensureHealthy: jest.fn(async () => undefined),
+      ensureModel: jest.fn(async () => undefined),
     };
 
     cache = {
