@@ -1,4 +1,5 @@
-const { MedicalPrompt, TemplateLoader, SectionDetector } = require('../prompts');
+import type { SectionManifest } from '../types/medical';
+import { MedicalPrompt, TemplateLoader, SectionDetector } from '../prompts';
 
 const template = TemplateLoader.load('medicine-management');
 const prompt = new MedicalPrompt(template);
@@ -16,24 +17,24 @@ describe('MedicalPrompt integration', () => {
   });
 
   it('generates a manifest-aware prompt that requests JSON output', () => {
-    const manifest = {
+    const manifest: SectionManifest = {
       entries: [
         {
           key: 'identification',
           title: 'Identification',
           type: 'known',
           format: 'paragraph',
-          templateSection: { required: true },
-          contentRange: { start: 0, end: 50 }
+          templateSection: { required: true, id: 'identification', format: 'paragraph' },
+          contentRange: { start: 0, end: 50 },
         },
         {
           key: 'speaker-1',
           title: 'Therapy Updates',
           type: 'speaker',
           format: 'paragraph',
-          contentRange: { start: 51, end: 120 }
-        }
-      ]
+          contentRange: { start: 51, end: 120 },
+        },
+      ],
     };
 
     const dictation = 'Identification John Smith. Therapy updates patient reports better sleep.';

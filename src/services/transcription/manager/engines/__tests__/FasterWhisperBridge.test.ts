@@ -1,5 +1,5 @@
-const path = require('path');
-const { FasterWhisperBridge } = require('../FasterWhisperBridge');
+import path from 'path';
+import { FasterWhisperBridge } from '../FasterWhisperBridge';
 
 describe('FasterWhisperBridge', () => {
   it('normalizes camelCase settings to bridge format', () => {

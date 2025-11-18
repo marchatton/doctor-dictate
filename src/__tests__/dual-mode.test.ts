@@ -1,6 +1,6 @@
-const { ProcessingModes, AutoModeSelector } = require('../services/processing/processing-config');
-const { OllamaFormatter } = require('../services/formatting/ollama-formatter');
-const { ContentVerifier } = require('../services/formatting/content-verifier');
+import { ProcessingModes, AutoModeSelector } from '../services/processing/processing-config';
+import { OllamaFormatter } from '../services/formatting/ollama-formatter';
+import { ContentVerifier } from '../services/formatting/content-verifier';
 
 describe('Processing configuration', () => {
   it('configures FAST mode with the lightweight Whisper model', () => {
@@ -24,7 +24,7 @@ describe('Processing configuration', () => {
 describe('Ollama formatter defaults', () => {
   it('uses the configured model when instantiated', () => {
     const formatter = new OllamaFormatter({ model: ProcessingModes.FAST.ollama.model });
-    expect(formatter.model).toBe('qwen2.5:1.5b');
+    expect((formatter as unknown as { model: string }).model).toBe('qwen2.5:1.5b');
   });
 });
 

@@ -2,9 +2,9 @@
  * End-to-end workflow tests for the complete medical dictation pipeline
  */
 
-const { ProcessorFactory } = require('../services/processing/unified-processor');
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { ProcessorFactory } from '../services/processing/unified-processor';
 
 // Full pipeline requires Whisper/Ollama runtime; opt-in via RUN_FULL_PIPELINE=true
 const RUN_FULL_PIPELINE = process.env.RUN_FULL_PIPELINE === 'true';
@@ -111,10 +111,10 @@ describeE2E('E2E Medical Dictation Workflow', () => {
       const processor = ProcessorFactory.createAccurate();
       
       // Mock service unavailability
-      const originalTranscribe = processor.transcribe;
+      const originalTranscribe = (processor as any).transcribe;
       let fallbackAttempted = false;
       
-      processor.transcribe = async function(...args) {
+      (processor as any).transcribe = async function (...args: unknown[]) {
         if (!fallbackAttempted) {
           fallbackAttempted = true;
           throw new Error('Service unavailable');
