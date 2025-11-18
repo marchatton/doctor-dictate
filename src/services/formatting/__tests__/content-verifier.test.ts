@@ -1,21 +1,22 @@
-const { ContentVerifier } = require('../content-verifier');
+import type { SectionManifest } from '../../../types/medical';
+import { ContentVerifier } from '../content-verifier';
 
 describe('ContentVerifier verifyStructuredNote', () => {
   const verifier = new ContentVerifier();
 
-  const manifest = {
+  const manifest: SectionManifest = {
     entries: [
       {
         key: 'identification',
         title: 'Identification',
-        contentRange: { start: 0, end: 80 }
+        contentRange: { start: 0, end: 80 },
       },
       {
         key: 'problem-list',
         title: 'Problem List',
-        contentRange: { start: 81, end: 200 }
-      }
-    ]
+        contentRange: { start: 81, end: 200 },
+      },
+    ],
   };
 
   const dictation = 'Identification: John Smith is a 14-year-old male with ADHD. Problem list: ADHD partial control.';
@@ -36,8 +37,8 @@ describe('ContentVerifier verifyStructuredNote', () => {
     const structured = {
       sections: [
         { key: 'identification', body: 'John Smith is a 14-year-old male.' },
-        { key: 'problem-list', body: 'ADHD' }
-      ]
+        { key: 'problem-list', body: 'ADHD' },
+      ],
     };
 
     const report = verifier.verifyStructuredNote({ dictationText: dictation, manifest, markdown, structured });

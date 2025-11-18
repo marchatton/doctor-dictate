@@ -1,4 +1,4 @@
-const { MemoryMonitor } = require('../MemoryMonitor');
+import { MemoryMonitor } from '../MemoryMonitor';
 
 describe('MemoryMonitor', () => {
   const originalMemoryUsage = process.memoryUsage;
@@ -9,6 +9,7 @@ describe('MemoryMonitor', () => {
     if (originalGc) {
       global.gc = originalGc;
     } else {
+      // @ts-expect-error gc may be undefined in tests
       delete global.gc;
     }
     jest.useRealTimers();

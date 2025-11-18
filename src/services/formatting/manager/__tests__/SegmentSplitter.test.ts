@@ -1,4 +1,4 @@
-const { SegmentSplitter } = require('../SegmentSplitter');
+import { SegmentSplitter } from '../SegmentSplitter';
 
 describe('SegmentSplitter', () => {
   it('splits long text into overlapping segments', () => {
