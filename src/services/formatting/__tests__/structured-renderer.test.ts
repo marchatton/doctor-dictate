@@ -1,35 +1,37 @@
-const { renderStructuredMarkdown } = require('../structured-renderer');
+import type { SectionManifest, StructuredPayload } from '../../../types/medical';
+import { renderStructuredMarkdown } from '../structured-renderer';
 
 describe('renderStructuredMarkdown', () => {
   const template = {
     formatting: {
-      sectionHeaderPrefix: '###'
-    }
+      sectionHeaderPrefix: '###',
+    },
   };
 
-  const manifest = {
+  const manifest: SectionManifest = {
     entries: [
       { key: 'identification', title: 'Identification', format: 'paragraph' },
       { key: 'custom-sleep-hygiene', title: 'Sleep Hygiene', format: 'bullet-list' },
-      { key: 'current-meds', title: 'Current Meds', format: 'numbered-list', id: 'current-meds' }
-    ]
+      { key: 'current-meds', title: 'Current Meds', format: 'numbered-list', id: 'current-meds' },
+    ],
   };
 
   it('renders sections in manifest order with appropriate formatting', () => {
-    const structured = {
+    const structured: StructuredPayload = {
       sections: [
         {
           key: 'custom-sleep-hygiene',
           title: 'Sleep Hygiene',
           body: 'Lights out by 10pm\nAvoid screens before bed',
-          confidence: 0.8
+          confidence: 0.8,
         },
         {
           key: 'identification',
-          body: 'John Smith is a 14-year-old male.'
-        }
+          body: 'John Smith is a 14-year-old male.',
+        },
       ],
-      uncategorized: []
+      uncategorized: [],
+      raw: {},
     };
 
     const markdown = renderStructuredMarkdown(structured, manifest, template);
@@ -42,11 +44,10 @@ describe('renderStructuredMarkdown', () => {
   });
 
   it('omits sections with empty bodies and appends uncategorized fragments', () => {
-    const structured = {
-      sections: [
-        { key: 'identification', body: '' }
-      ],
-      uncategorized: ['Raw fragment']
+    const structured: StructuredPayload = {
+      sections: [{ key: 'identification', body: '' }],
+      uncategorized: ['Raw fragment'],
+      raw: {},
     };
 
     const markdown = renderStructuredMarkdown(structured, manifest, template);
@@ -57,14 +58,15 @@ describe('renderStructuredMarkdown', () => {
   });
 
   it('normalizes medications and flags uncertain names', () => {
-    const structured = {
+    const structured: StructuredPayload = {
       sections: [
         {
           key: 'current-meds',
-          body: '1. Jordan APM 60 mg (qhs)\n2. Lexapro 20 mg (qhs)'
-        }
+          body: '1. Jordan APM 60 mg (qhs)\n2. Lexapro 20 mg (qhs)',
+        },
       ],
-      uncategorized: []
+      uncategorized: [],
+      raw: {},
     };
 
     const markdown = renderStructuredMarkdown(structured, manifest, template);
