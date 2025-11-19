@@ -23,7 +23,7 @@ All items below are currently **Todo** unless marked otherwise.
 - [x] Rename core Electron files to `.ts` and type IPC handler contracts.
 - [x] Define and share a `window.electronAPI` interface between preload and renderer.
 - [x] Convert remaining CommonJS exports to ES modules while preserving initialization order. _(Main process now consumes the typed transcription manager stack directly.)_
-- [ ] Extend Jest/e2e suites (`src/__tests__/main.test.js`, `src/__tests__/e2e-workflow.test.js`, `test/test-dual-mode.js`, etc.) to import the typed modules instead of the legacy `.js` entrypoints.
+- [x] Extend Jest/e2e suites (`src/__tests__/main.test.ts`, `src/__tests__/dual-mode.test.ts`, `src/__tests__/prompt-integration.test.ts`, opt-in `src/__tests__/e2e-workflow.test.ts`) to import the typed modules instead of the legacy `.js` entrypoints.
 
 ## 3. Renderer UI (React components & hooks) — **Status: In Progress**
 - [x] Migrate renderer components and hooks to `.tsx` with typed props, state, and contexts. _(Legacy DOM helpers under `src/components/ui` and `src/renderer.ts` have been removed; the active React/Vite renderer is fully typed.)_
@@ -47,7 +47,7 @@ All items below are currently **Todo** unless marked otherwise.
 - [x] Convert Jest mocks under `src/__mocks__` to TypeScript or provide `.d.ts` shims. _(Electron, file, and style mocks now export typed `.ts` stubs and are referenced via `jest.config.js` mappers.)_
 - [x] Rename renderer-facing tests to `.test.tsx` / `.test.ts`. _(Core Electron/render suites such as `src/__tests__/app.test.ts` and the transcription manager tests now run in TypeScript; remaining legacy suites still need conversion.)_
 - [x] Ensure coverage tooling targets new extensions.
-- [ ] Convert the remaining JS-only suites (`src/__tests__/dual-mode.test.js`, `src/__tests__/e2e-workflow.test.js`, `src/services/formatting/**/__tests__/*.test.js`, `src/services/transcription/**/__tests__/*.test.js`, `src/prompts/__tests__/*.test.js`, etc.) or supply `.d.ts` shims so ts-jest doesn’t fall back to `any`.
+- [x] Convert the remaining JS-only suites (`src/services/formatting/**/__tests__/*.test.ts`, `src/services/transcription/**/__tests__/*.test.ts`, `src/prompts/__tests__/*.test.ts`, `src/__tests__/*.test.ts`, etc.) so ts-jest no longer falls back to `any`.
 
 ## 7. Build Scripts & Automation — **Status: Todo**
 - [ ] Review helper scripts that touch `src` modules and update paths/compilation steps. _(Notably `scripts/test-runners/*.js`, `scripts/setup-ollama-models.js`, and the packaging helpers still import `.js` sources under `src/`.)_
@@ -62,8 +62,8 @@ All items below are currently **Todo** unless marked otherwise.
 
 ## Completion Checklist (blocking items)
 1. **Electron coverage**
-   - [ ] Convert `src/__tests__/main.test.js` to `.ts` and import the typed IPC contracts.
-   - [ ] Modernize `src/__tests__/e2e-workflow.test.js` + `test/test-dual-mode.js` so they spin up the TS build artifacts (or add `.d.ts` shims if they must stay JS).
+   - [x] Convert `src/__tests__/main.test.js` to `.ts` and import the typed IPC contracts.
+   - [ ] Modernize the standalone `scripts/test-runners/*` harnesses (e.g., `test-dual-mode.js`) so they consume the TS build artifacts or ship with `.d.ts` shims if they must stay JS.
 2. **Renderer consolidation**
    - [ ] Extract shared variant/intent enums into `src/types/ui.ts` and refactor `RecordingScreen`, `TranscriptionModeSelector`, `ProcessingScreen`, etc. to consume them.
    - [ ] Refresh README + `docs/renderer.md` snippets to reflect strict TS usage (no `any`, no deprecated props).

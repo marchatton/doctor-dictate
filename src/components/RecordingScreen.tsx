@@ -3,24 +3,13 @@ import { MicIcon, StopCircleIcon, CheckCircleIcon } from 'lucide-react';
 import { AudioWaveform } from './AudioWaveform';
 import { TranscriptionModeSelector } from './ui/TranscriptionModeSelector';
 import type { ElectronAPI, TranscriptionModeInfo, TranscriptionProgressUpdate } from '../types/ipc';
+import type { RecordingTranscriptPayload } from '../types/ui';
 
 declare global {
   interface Window {
     electronAPI?: ElectronAPI;
   }
 }
-
-type RecordingTranscriptPayload =
-  | string
-  | {
-      transcript?: string;
-      formatted?: string;
-      raw?: string;
-      corrections?: Array<Record<string, unknown>>;
-      medications?: string[];
-      metadata?: Record<string, unknown>;
-      [key: string]: unknown;
-    };
 
 interface RecordingScreenProps {
   availableModes: TranscriptionModeInfo[];

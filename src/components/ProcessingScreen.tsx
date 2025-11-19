@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircleIcon, CircleIcon, Clock3Icon } from 'lucide-react';
+import type { ModeDecision, ProcessingStepId } from '../types/ui';
 
-const PROCESSING_STEPS = [
+const PROCESSING_STEPS: Array<{ id: ProcessingStepId; label: string; weight: number; longStep?: boolean }> = [
   {
     id: 'audio',
     label: 'Preparing audio',
@@ -24,20 +25,6 @@ const PROCESSING_STEPS = [
     weight: 5,
   },
 ] as const;
-interface ModeDecision {
-  mode?: string;
-  reason?: string;
-  heuristics?: {
-    audio?: {
-      durationSeconds?: number;
-      fileSizeBytes?: number;
-    };
-    system?: {
-      totalMemMB?: number;
-      freeMemMB?: number;
-    };
-  };
-}
 
 interface ProcessingScreenProps {
   modeKey: string;
